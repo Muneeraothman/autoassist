@@ -74,3 +74,17 @@ Did a full quiz review of everything from Phase 0 before touching new material. 
 - **Files getting mixed up while editing** — with `main.py`, `models.py`, and `database.py` all open and being edited around the same time, it was easy to lose track of which file a change actually landed in. Lesson: check `git diff` after edits to confirm the change went where expected, rather than assuming.
 - **Zombie server process on port 8000** — restarting `uvicorn` failed because a previous run was still holding port 8000 in the background even though the terminal that started it was closed. Fixed by finding the leftover process (`lsof -i :8000`) and killing it (`kill <PID>`) before starting the server again.
 - **Docker Desktop not running** — Postgres commands failed with a connection error because Docker Desktop (the actual app) wasn't open, even though Docker itself is installed. Docker Desktop has to be running in the background before `docker run`/`docker ps` will work.
+
+**Phase 2 review quiz — multiple choice, one at a time:**
+
+Solid on the first try:
+- What `Depends(get_db)` does (opens a session, hands it to the endpoint, closes it after)
+- Why Docker commands were failing (Docker Desktop, the app, wasn't running — separate from Docker being installed)
+- Lexus vs. Honda scheduling (fixed mileage/time table vs. Honda's live oil-life % + dashboard codes)
+
+Needed re-teaching:
+- **Why the port 8000 error happened** — first guessed it was a bad `DATABASE_URL`; that variable only affects the Postgres connection, not the port the FastAPI server itself listens on. The actual cause was a zombie `uvicorn` process from an earlier run still holding the port.
+- **Finding what's using a port** — first guessed `kill -9 8000` (which would try to kill a process with PID 8000, not free the port). Correct command is `lsof -i :8000` to find the actual PID, *then* `kill <PID>`.
+- **`GET /api/services` walkthrough (own words, no multiple choice)** — described it as listing `schedule_items`. Re-taught the distinction: `schedule_items` is the *reference* table (what should happen, at what interval); `service_records` (what `/api/services` actually queries) is the *history* table (what maintenance actually happened, when, and for how much). Also missed the manual serialization step (dates converted to `str`, `cost` converted to `float`/`None`) since raw `date`/`Decimal` values aren't JSON-serializable.
+
+**Takeaway:** the `schedule_items` vs. `service_records` mix-up lines up with the "files getting mixed up while editing" gotcha above — worth deliberately re-reading `models.py` next session before touching either table again.
