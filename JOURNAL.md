@@ -58,3 +58,19 @@ Did a full quiz review of everything from Phase 0 before touching new material. 
 - Loading in the real Accord maintenance codes as seed data
 
 *(This section will be filled in as we go.)*
+
+---
+
+## Session 4 — Phase 2: Schedule & Service Endpoints, plus the Lexus Switch
+
+**What I did:**
+- Switched the project's car from the 2013 Honda Accord to my actual daily driver, a **2002 Lexus ES300** — added its owner's manual PDFs (`manuals/OM33566U.pdf`, `manuals/SMG202.pdf`) and refreshed `seed.sql` with the Lexus's real fixed-interval maintenance schedule. (`manuals/2A1313OM.pdf`, the old Accord manual, is still in the repo but no longer the source of truth.)
+- Built out `main.py` so it now has three working endpoints: `GET /api/vehicle` (already existed), plus new `GET /api/schedule` and `GET /api/services`, each querying its table via SQLAlchemy and returning JSON.
+
+**What I learned:**
+- The Lexus doesn't have anything like Honda's Maintenance Minder — its manual just lists a fixed mileage/time table, which is actually simpler to model: no live oil-life calculation, just compare current mileage/date against fixed intervals.
+
+**Gotchas / things that took longer than expected:**
+- **Files getting mixed up while editing** — with `main.py`, `models.py`, and `database.py` all open and being edited around the same time, it was easy to lose track of which file a change actually landed in. Lesson: check `git diff` after edits to confirm the change went where expected, rather than assuming.
+- **Zombie server process on port 8000** — restarting `uvicorn` failed because a previous run was still holding port 8000 in the background even though the terminal that started it was closed. Fixed by finding the leftover process (`lsof -i :8000`) and killing it (`kill <PID>`) before starting the server again.
+- **Docker Desktop not running** — Postgres commands failed with a connection error because Docker Desktop (the actual app) wasn't open, even though Docker itself is installed. Docker Desktop has to be running in the background before `docker run`/`docker ps` will work.

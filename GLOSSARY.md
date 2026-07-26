@@ -114,8 +114,24 @@ Plain-English explanations of every term as I encounter it. No jargon assumed.
 
 ---
 
+## Local Dev Debugging
+
+**Zombie process** — A program (like the `uvicorn` dev server) that's still running in the background even though you closed the terminal window or thought you stopped it. It keeps holding onto whatever it was using (like a network port), so the next time you try to start the same thing, it fails as if it were already running — because it is.
+
+**Port already in use** — An error you get trying to start a server on a port (like 8000) that's already occupied by another running process — usually a zombie process from a previous run. Fixed by finding what's using the port (`lsof -i :8000`) and stopping it (`kill <PID>`), then starting fresh.
+
+**lsof** — "List open files." A command that can show you what process is using a given network port: `lsof -i :8000` lists whatever has port 8000 open.
+
+**kill** — Stops a running process by its process ID (PID). `kill <PID>` asks it to shut down; needed when a zombie process is blocking a port you want to reuse.
+
+**Docker Desktop** — The actual application on your Mac that runs the Docker engine in the background. Installing Docker isn't enough — Docker Desktop has to be open and running before commands like `docker run` or `docker ps` will work. If it's not running, those commands fail with a connection error even though Docker itself is installed correctly.
+
+---
+
 ## This Project's Car-Specific Terms
 
-**Maintenance Minder™** — Honda/Acura's built-in system that calculates a live "engine oil life %" based on actual driving conditions, and tells you via a dashboard code (like "A1" or "B12") when service is due. Not a fixed mileage table like some other brands use.
+**Maintenance Minder™** — Honda/Acura's built-in system that calculates a live "engine oil life %" based on actual driving conditions, and tells you via a dashboard code (like "A1" or "B12") when service is due. Not a fixed mileage table like some other brands use. This described the project's *original* car (a 2013 Honda Accord) — the project has since switched to a 2002 Lexus ES300, so these terms are historical context, not how the current car's schedule works.
 
-**Maintenance code** — The letter/number Honda uses to label a bundle of services (e.g. Code A = oil change only, Code B = oil change + filter + brake inspection + more, Code 1 = rotate tires).
+**Maintenance code** — The letter/number Honda uses to label a bundle of services (e.g. Code A = oil change only, Code B = oil change + filter + brake inspection + more, Code 1 = rotate tires). Historical/Honda-specific — see note above.
+
+**Fixed maintenance interval** — The Lexus's (and most other brands') approach to maintenance scheduling: the owner's manual lists a straightforward table of services due at specific mileage/time marks (e.g. "replace every 30,000 miles or 24 months"), instead of Honda's adaptive Maintenance Minder system. Simpler to model in the database — no live oil-life calculation needed, just mileage/date math against a fixed table.
