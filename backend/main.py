@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from database import get_db
+from engine import get_upcoming_maintenance
 from models import Vehicle, ScheduleItem, ServiceRecord
 
 app = FastAPI()
@@ -42,6 +43,17 @@ def get_service_or_404(db: Session, service_id: int) -> ServiceRecord:
     if record is None:
         raise HTTPException(status_code=404, detail="Service record not found")
     return record
+
+
+def serialize_schedule_item(item: ScheduleItem) -> dict:
+    return {
+        "id": item.id,
+        "service_name": item.service_name,
+        "interval_miles": item.interval_miles,
+        "interval_months": item.interval_months,
+        "severe_interval_miles": item.severe_interval_miles,
+        "notes": item.notes,
+    }
 
 
 def serialize_service(record: ServiceRecord) -> dict:
@@ -119,16 +131,30 @@ def update_mileage(update: MileageUpdate, db: Session = Depends(get_db)):
 @app.get("/api/schedule")
 def get_schedule(db: Session = Depends(get_db)):
     items = db.query(ScheduleItem).order_by(ScheduleItem.id).all()
+    return [serialize_schedule_item(item) for item in items]
+
+
+@app.get("/api/upcoming")
+def get_upcoming(db: Session = Depends(get_db)):
+    vehicle = get_vehicle_or_404(db)
+    schedule_items = db.query(ScheduleItem).order_by(ScheduleItem.id).all()
+    service_records = db.query(ServiceRecord).all()
+
+    results = get_upcoming_maintenance(vehicle, schedule_items, service_records, date.today())
+
+    status_rank = {"OVERDUE": 0, "DUE_SOON": 1, "OK": 2}
+    results.sort(key=lambda r: (status_rank[r["status"]], r["due_date"] or date.min))
+
     return [
         {
-            "id": item.id,
-            "service_name": item.service_name,
-            "interval_miles": item.interval_miles,
-            "interval_months": item.interval_months,
-            "severe_interval_miles": item.severe_interval_miles,
-            "notes": item.notes,
+            "schedule_item": serialize_schedule_item(entry["schedule_item"]),
+            "due_date": str(entry["due_date"]) if entry["due_date"] else None,
+            "due_miles": entry["due_miles"],
+            "status": entry["status"],
+            "days_remaining": entry["days_remaining"],
+            "miles_remaining": entry["miles_remaining"],
         }
-        for item in items
+        for entry in results
     ]
 
 

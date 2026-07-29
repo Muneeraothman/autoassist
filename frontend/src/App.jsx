@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import VehicleCard from './VehicleCard'
 import LogServiceForm from './LogServiceForm'
 import ServiceHistory from './ServiceHistory'
+import UpcomingMaintenance from './UpcomingMaintenance'
 import './App.css'
 
 function App() {
@@ -18,6 +19,11 @@ function App() {
       .finally(() => setVehicleLoading(false))
   }, [])
 
+  const handleMileageUpdated = useCallback(async () => {
+    await fetchVehicle()
+    setHistoryRefreshKey((key) => key + 1)
+  }, [fetchVehicle])
+
   useEffect(() => {
     fetchVehicle()
     fetch('/api/schedule')
@@ -28,7 +34,8 @@ function App() {
   return (
     <div className="app">
       <h1>AutoAssist</h1>
-      <VehicleCard vehicle={vehicle} loading={vehicleLoading} onMileageUpdated={fetchVehicle} />
+      <VehicleCard vehicle={vehicle} loading={vehicleLoading} onMileageUpdated={handleMileageUpdated} />
+      <UpcomingMaintenance refreshKey={historyRefreshKey} />
       <LogServiceForm
         scheduleItems={scheduleItems}
         currentMileage={vehicle?.current_mileage}

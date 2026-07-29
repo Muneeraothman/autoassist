@@ -99,3 +99,63 @@ th {
   color: var(--text);
   font-weight: 500;
 }
+
+.upcoming-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.upcoming-item {
+  border-left: 4px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  background: var(--code-bg);
+}
+
+.upcoming-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.upcoming-item-name {
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.status-overdue {
+  border-left-color: #e5484d;
+}
+.status-overdue .status-badge {
+  background: rgba(229, 72, 77, 0.15);
+  color: #e5484d;
+}
+
+.status-due_soon {
+  border-left-color: #f5a623;
+}
+.status-due_soon .status-badge {
+  background: rgba(245, 166, 35, 0.15);
+  color: #f5a623;
+}
+
+.status-ok {
+  border-left-color: #30a46c;
+}
+.status-ok .status-badge {
+  background: rgba(48, 164, 108, 0.15);
+  color: #30a46c;
+}
