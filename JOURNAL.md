@@ -88,3 +88,43 @@ Needed re-teaching:
 - **`GET /api/services` walkthrough (own words, no multiple choice)** — described it as listing `schedule_items`. Re-taught the distinction: `schedule_items` is the *reference* table (what should happen, at what interval); `service_records` (what `/api/services` actually queries) is the *history* table (what maintenance actually happened, when, and for how much). Also missed the manual serialization step (dates converted to `str`, `cost` converted to `float`/`None`) since raw `date`/`Decimal` values aren't JSON-serializable.
 
 **Takeaway:** the `schedule_items` vs. `service_records` mix-up lines up with the "files getting mixed up while editing" gotcha above — worth deliberately re-reading `models.py` next session before touching either table again.
+
+---
+
+## Session 5 — Phase 2: Finishing the Backend API (2026-07-27)
+
+**What I did:**
+- Built `PATCH /api/vehicle/mileage` — updates `current_mileage` and recomputes `avg_miles_per_day` from the elapsed time and mileage since the last update. Wrote the `MileageUpdate` Pydantic model (`Field(gt=0)`) and the three-way logic (reject a decrease, skip the recompute if less than a day has passed, otherwise divide miles driven by days elapsed) myself before it went into `main.py`.
+- Fixed `GET /api/services` to sort newest-first (`.order_by(ServiceRecord.service_date.desc())`) and added the optional `?schedule_item_id=` filter.
+- Built `POST /api/services` (creates a record, `ServiceCreate` Pydantic model with a custom `@field_validator` rejecting future dates, plus a route-level check rejecting `mileage_at_service` more than 500 miles ahead of the vehicle's current mileage — my call, since backfilling older service records with lower mileage should still be allowed), `PUT /api/services/{id}` (full update, reuses `ServiceCreate`), and `DELETE /api/services/{id}`.
+- Added consistent 404 handling across every route via two small helpers, `get_vehicle_or_404` and `get_service_or_404` — previously `db.query(...).first()` returning `None` would crash with an unhandled `AttributeError` instead of a clean error.
+- Had Claude test every new endpoint with curl (valid + invalid cases for each validation rule, 404s on bad IDs, decrease rejection) instead of doing it by hand this session, to move faster since the underlying patterns (Pydantic validation, `db.add`/`commit`/`refresh`) were already covered in earlier phases.
+
+**What I learned:**
+- The split between **Pydantic-level validation** (shape/type/static bounds, no DB access — e.g. cost ≥ 0, date not in the future) and **route-level validation** (needs a DB lookup — e.g. mileage decrease, mileage-vs-current-mileage sanity bound) is a real architectural line, not just a style choice: Pydantic models have no access to `db`.
+- A freshly-built ORM object (`ServiceRecord(...)`) isn't tracked by SQLAlchemy until `db.add(...)` — different from `PATCH`, which only needed `db.commit()` because it modified an object already fetched via `db.query(...)`.
+
+**Gotchas / things that took longer than expected:**
+- **Resetting the DB from `seed.sql` didn't work as documented.** `CLAUDE.md` says `psql "$DATABASE_URL" -f seed.sql`, but `psql` isn't installed on the Mac itself — it only exists inside the `autoassist-db` Docker container. On top of that, `seed.sql` is a plain dump with no `DROP TABLE` statements, so reapplying it against a database that already has the tables just threw a wall of "already exists" errors and silently left stale test data in place. The actual fix: `docker exec` into the container, `DROP SCHEMA public CASCADE; CREATE SCHEMA public;` first, *then* reload `seed.sql`.
+
+**Still pending before Phase 3:** the full Phase 2 review quiz needs to happen on this session's material specifically — the quiz logged earlier only covered the three `GET` endpoints, not the `PATCH`/`POST`/`PUT`/`DELETE` work or the validation-split concept from this session.
+
+*(Update, same day: did a 5-question multiple-choice quiz + one open-ended question on this session's material. Missed 4 of the 5 multiple-choice questions on the first pass — Pydantic-vs-route validation split, `db.add()` vs `db.commit()`, the missing-vehicle 404 bug, and why the future-date rule needs a custom validator instead of `Field()` — each was re-taught in full before moving on. Correctly got the query-parameter-vs-path-parameter question. Didn't attempt the final open-ended "walk through a POST request" question ("idk"), so I did the full walkthrough instead. After that quiz, explicitly asked to stop doing the fill-in-the-blank/quiz process for the rest of the project — see below.)*
+
+---
+
+## Session 6 — Phase 3: Frontend, and a Pacing Change (2026-07-29)
+
+**What changed first:** partway through the Phase 2 review quiz, decided to stop the teaching-loop process (fill-in-the-blank, step-by-step walkthroughs, phase-end quizzes) for the rest of the project. From here on: build each phase, test it, get a summary, check in at phase boundaries only. `LEARNING_PROCESS.md`/`CLAUDE.md` still describe the old process on disk; that's now intentionally stale rather than actively followed.
+
+**What got built (Phase 3 — Frontend):**
+- Scaffolded `frontend/` with Vite + React, configured `vite.config.js` to proxy `/api/*` to the FastAPI backend on port 8000 for local dev.
+- Three components composed in `App.jsx`: `VehicleCard` (vehicle info + inline mileage update), `LogServiceForm` (dropdown of schedule items or "Other/Repair", date, mileage pre-filled with current mileage, cost, performed by, notes), `ServiceHistory` (table, newest first, filterable by schedule item).
+- Plain `useState`/`fetch`, no state management library — vehicle data lives in `App` and gets passed down as props ("lifting state up") since both `VehicleCard` and `LogServiceForm` need it.
+- Basic dark/light-aware styling in `App.css`, loading and empty states on every fetch-backed view.
+
+**Bug caught during actual browser testing (not just curl):** the mileage field in `LogServiceForm` pre-filled once from `current_mileage` and then never updated again, even after `VehicleCard` successfully changed the vehicle's mileage — so logging a service right after updating mileage would silently use the *stale* pre-filled number instead of the new one. Fixed by tracking a separate `mileageTouched` flag: the field re-syncs to `current_mileage` whenever it changes, unless the user has actually typed into it, and resets to "untouched" after each successful submit. This is exactly the kind of bug that never shows up in an API-only curl test — it only appeared once the two components were exercised together in a real browser session.
+
+**Full-loop checkpoint (via actual browser automation, not just curl):** updated mileage on the vehicle card → confirmed the average recalculated correctly → logged a service (pre-filled mileage matched the just-updated value) → saw it appear at the top of Service History → refreshed the page → data was still there, confirming it's really coming from Postgres and not just sitting in React state. No console errors.
+
+**Gotchas:** none new this session beyond the mileage pre-fill bug above — DB reset (`docker exec` + schema drop, from Session 5) worked cleanly on the first try this time.

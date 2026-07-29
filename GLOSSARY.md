@@ -128,6 +128,48 @@ Plain-English explanations of every term as I encounter it. No jargon assumed.
 
 ---
 
+## Backend API (FastAPI, Pydantic, SQLAlchemy)
+
+**Pydantic model** — A Python class (inherits from `BaseModel`) that describes the required shape of incoming data: field names, types, and rules. FastAPI checks every request body against it automatically, before your route function ever runs. If the data doesn't match, the client gets a `422` error with no extra code needed. **Analogy:** a bouncer with a checklist at the door — data has to pass the checklist before it's let in.
+
+**`Field(...)`** — Attaches extra constraints to a Pydantic field beyond its basic type, e.g. `Field(gt=0)` ("greater than 0") or `Field(ge=0)` ("greater than or equal to 0"). Used for static, always-true bounds — a plain type hint alone can't express "must be positive."
+
+**Custom validator (`@field_validator`)** — For rules `Field(...)` can't express because they depend on something computed at request time (like "not in the future," which needs today's actual date). A function decorated with `@field_validator("field_name")` runs after normal type-checking, and can `raise ValueError(...)` to reject the value — Pydantic turns that into a `422` automatically. Must always `return` the value if it passes.
+
+**`HTTPException`** — FastAPI's mechanism for returning an error response from inside a route function: `raise HTTPException(status_code=..., detail="...")`. Stops the function immediately and sends that status code + message back to the client.
+
+**HTTP status codes used in this project** — `200` (success, default), `201` (successfully created something new, set via `status_code=201` on `@app.post`), `204` (success, no content to return — used for `DELETE`), `404` (nothing found at this ID), `422` (the request itself was invalid — bad shape or failed a validation rule).
+
+**PATCH vs. PUT vs. POST vs. DELETE** — the four HTTP verbs this project's API uses: `POST` creates a new resource, `PUT` replaces an existing one entirely (all fields), `PATCH` updates only part of one (this project's `PATCH /api/vehicle/mileage` only ever touches mileage-related fields), `DELETE` removes it. FastAPI has a matching decorator for each (`@app.post`, `@app.put`, etc.).
+
+**Query parameter** — Data passed in the URL after a `?`, like `?schedule_item_id=8`. In FastAPI, any plain function parameter with a default value that *isn't* part of the URL path becomes a query parameter automatically — no special decorator syntax needed, e.g. `def get_services(schedule_item_id: int | None = None, ...)`.
+
+**`db.add()` vs. `db.commit()`** — `db.commit()` alone is enough for an object SQLAlchemy is already tracking (e.g. one fetched via `db.query(...)`, then modified). A brand-new object built with `Model(...)` isn't tracked yet — `db.add(new_object)` is what tells SQLAlchemy "start tracking this," and has to happen before `db.commit()` for it to actually get saved.
+
+**`.desc()`** — Called on a SQLAlchemy column inside `.order_by(...)` to sort descending (newest/highest first) instead of the default ascending order.
+
+---
+
+## Frontend (React, Vite)
+
+**Vite** — A fast build tool/dev server for frontend projects. `npm create vite@latest` scaffolds a new project; `npm run dev` starts a local dev server with hot-reload (edit a file, browser updates without a manual refresh).
+
+**Dev server proxy** — A Vite config setting (`server.proxy` in `vite.config.js`) that forwards requests matching a path (e.g. `/api/*`) from the frontend's dev server to another server (the FastAPI backend on port 8000). Lets frontend code just call `fetch('/api/vehicle')` without hardcoding a backend URL, and sidesteps CORS issues in local dev.
+
+**Component** — A self-contained, reusable piece of UI written as a function that returns JSX (HTML-like syntax inside JavaScript). This project has one per major page section: `VehicleCard`, `LogServiceForm`, `ServiceHistory`, composed together inside `App`.
+
+**Props** — Data passed from a parent component into a child component, e.g. `<VehicleCard vehicle={vehicle} loading={vehicleLoading} onMileageUpdated={fetchVehicle} />`. One-directional: the child reads props but can't change them directly.
+
+**`useState`** — A React "hook" that gives a component memory across re-renders: `const [value, setValue] = useState(initialValue)`. Calling `setValue` updates `value` *and* triggers the component to re-render with the new value.
+
+**`useEffect`** — A React hook for running code in response to a component appearing or specific values changing (e.g. fetching data when a component first loads). The array at the end (`[currentMileage, mileageTouched]`) lists which values, when changed, should re-run the effect.
+
+**Lifting state up** — Keeping shared data (like the `vehicle` object) in a parent component (`App`) instead of duplicating it in multiple children, so every child that needs it gets it via props and always sees the same up-to-date value. Why `vehicle` lives in `App` rather than inside `VehicleCard` alone: `LogServiceForm` also needs `current_mileage` to pre-fill its mileage field.
+
+**Controlled input** — A form input whose displayed value is driven entirely by React state (`value={mileage}` + `onChange={(e) => setMileage(e.target.value)}`), rather than the browser managing its own internal value. Necessary any time you need to read, validate, or reset a field's value from JavaScript.
+
+---
+
 ## This Project's Car-Specific Terms
 
 **Maintenance Minder™** — Honda/Acura's built-in system that calculates a live "engine oil life %" based on actual driving conditions, and tells you via a dashboard code (like "A1" or "B12") when service is due. Not a fixed mileage table like some other brands use. This described the project's *original* car (a 2013 Honda Accord) — the project has since switched to a 2002 Lexus ES300, so these terms are historical context, not how the current car's schedule works.
