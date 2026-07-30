@@ -159,3 +159,15 @@ th {
   background: rgba(48, 164, 108, 0.15);
   color: #30a46c;
 }
+
+.chart-label {
+  font-weight: 500;
+  color: var(--text-h);
+  margin-top: 20px;
+  margin-bottom: 4px;
+}
+
+.chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+}

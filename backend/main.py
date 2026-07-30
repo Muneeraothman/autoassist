@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from engine import get_upcoming_maintenance
 from models import Vehicle, ScheduleItem, ServiceRecord
+from stats import compute_stats
 
 app = FastAPI()
 
@@ -132,6 +133,15 @@ def update_mileage(update: MileageUpdate, db: Session = Depends(get_db)):
 def get_schedule(db: Session = Depends(get_db)):
     items = db.query(ScheduleItem).order_by(ScheduleItem.id).all()
     return [serialize_schedule_item(item) for item in items]
+
+
+@app.get("/api/stats")
+def get_stats(db: Session = Depends(get_db)):
+    vehicle = get_vehicle_or_404(db)
+    schedule_items = db.query(ScheduleItem).order_by(ScheduleItem.id).all()
+    service_records = db.query(ServiceRecord).all()
+
+    return compute_stats(vehicle, schedule_items, service_records)
 
 
 @app.get("/api/upcoming")

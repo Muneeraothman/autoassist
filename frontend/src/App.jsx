@@ -3,6 +3,7 @@ import VehicleCard from './VehicleCard'
 import LogServiceForm from './LogServiceForm'
 import ServiceHistory from './ServiceHistory'
 import UpcomingMaintenance from './UpcomingMaintenance'
+import SpendingDashboard from './SpendingDashboard'
 import './App.css'
 
 function App() {
@@ -42,6 +43,7 @@ function App() {
         onServiceLogged={() => setHistoryRefreshKey((key) => key + 1)}
       />
       <ServiceHistory scheduleItems={scheduleItems} refreshKey={historyRefreshKey} />
+      <SpendingDashboard refreshKey={historyRefreshKey} />
     </div>
   )
 }
