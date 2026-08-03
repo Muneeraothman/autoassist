@@ -64,7 +64,17 @@ The GitHub repo was switched from public to private specifically because Muneera
 
 - LLM provider for Phases 10–11 (Bedrock vs. OpenAI) has NOT been decided. The guide asks for this to be settled in Phase 0; it wasn't. Ask Muneera directly when Phase 10 approaches — don't default to pgvector/OpenAI or Bedrock just because one is "cheaper" or "simpler," actually ask which she has access to / prefers, per the guide's own instruction.
 - Whether Muneera actually did the Phase 4 checkpoint's "explain the whichever-comes-first logic out loud, unprompted" rehearsal is unconfirmed. It was suggested to her in conversation but no explicit confirmation came back before the session moved on to Phase 5 discussions. Worth confirming/doing if picking this project back up, since the guide calls this her "#1 interview talking point."
-- The Phase 4 bucketing OR-condition fix (see 4.4 below) was flagged as needed and Claude Code said it would add it, but this was never independently re-verified in the final `engine.py`. Check this file directly before assuming it's correct.
+- ~~The Phase 4 bucketing OR-condition fix (see 4.4 below) was flagged as needed and Claude Code said it would add it, but this was never independently re-verified in the final `engine.py`.~~ **Resolved as of the Phase 4.5 session**: independently re-verified directly in `engine.py` (`miles_remaining is not None and miles_remaining <= due_soon_miles`, present) and confirmed by the full passing test suite including `test_due_soon_triggered_by_miles_threshold_alone`. Settled — no longer an open item.
+
+### 3.7 — Phase 4.5 addendum's Section 6 open decisions, as actually decided
+
+Per `AUTOASSIST_ADDENDUM_PHASE_4_5_AUTH.md` §6, these were not to be defaulted silently. Decided directly with Muneera before Phase 4.5 work began:
+
+- **Token storage**: httpOnly cookie (not localStorage) — the more defensible choice against XSS token theft, at the cost of needing the backend to read `Request.cookies` instead of an `Authorization` header (this actually contradicted the addendum's own Section 4 step 5 wording, which assumed a header — corrected during implementation, see the Phase 4.5 entry below).
+- **JWT expiry**: a single longer-lived token (~7 days), no refresh token — simpler, judged "good enough for a portfolio project" per the addendum's own framing of that option.
+- **Password reset**: build now, real sending via AWS SES — pulled forward from Phase 9 rather than deferred to a "v2 ideas" note.
+- **Email verification**: build now, same SES mechanism — same reasoning as password reset.
+- **Schedule-item entry (add-a-car UX)**: stays a manual SQL insert per new vehicle for now, NOT a real UI form. `POST /api/vehicles` solves "add a car" only; entering that car's maintenance intervals is still the same manual transcription process used for the original Lexus data. Deliberately kept out of scope to avoid Phase 4.5 scope creep — a real form remains a good, explicitly-recorded follow-up (see the addendum's Section 7 idea about reusing Phase 11's PDF-parsing pipeline for this eventually).
 
 ## 4. Phase-by-phase status
 
@@ -148,16 +158,42 @@ Stats/Dashboard (Phase 4's stretch goal, also done): `backend/stats.py`, functio
 
 Phase 4 fully committed and pushed (commits `6829497` then `bee8210` for the stats/dashboard addition).
 
-### 🔲 Phase 5 — Receipt Photo Uploads (S3) — IN PROGRESS, NOT STARTED CODING YET
+### ✅ Phase 4.5 — Multi-User Auth, Email Verification, Password Reset (COMPLETE)
 
-This is where the session was paused. Status of AWS setup specifically:
+Inserted before Phase 5 per `AUTOASSIST_ADDENDUM_PHASE_4_5_AUTH.md` — see that file for the full rationale and forward-impact on Phases 5–12. Core auth and the email-verification/password-reset extension (pulled forward from Phase 9) are both done.
 
-- Muneera created her own personal AWS account (deliberately NOT her dad's, after discussing the tradeoff — her dad's account was offered and he'd said yes, but she chose to use her own card/account for a cleaner, fully-hers setup going forward).
-- Billing alert/CloudWatch alarm was explicitly SKIPPED at Muneera's request ("let's just ignore this") — she was walked through why it's a good idea (near-zero expected cost, but a tripwire against misconfiguration) but chose to decline it. Do not assume a billing alarm exists. If cost ever becomes a concern later, this is unfinished/available to revisit.
-- IAM user creation was in progress, not confirmed complete. Last known state: Muneera was told to create an IAM user named `autoassist-dev`, attach the `AmazonS3FullAccess` policy directly, then generate a CLI-type access key pair. Whether this was actually finished is UNCONFIRMED — the conversation was interrupted by a request for this handoff document before she confirmed "done." First thing to check in a new session: has the `autoassist-dev` IAM user been created, and does she have both an Access Key ID and Secret Access Key saved somewhere (not in this chat — she was correctly instructed never to paste AWS credentials into chat, same policy as the earlier GitHub PAT incident)?
-- AWS CLI was already confirmed installed on at least one of her laptops (`aws-cli/2.36.11`), found during Claude Code's Phase 5 planning — but `aws configure` (actually entering credentials) has not happened yet.
+**Schema:** `users` table (email, hashed_password, created_at, email_verified), `vehicles.user_id` (nullable during backfill, then `NOT NULL` — backfilled via the real registration endpoint per the addendum's Section 3 plan, not a hand-inserted row), `email_tokens` (single-use, typed `verify_email`/`reset_password`, expiring).
+
+**Core auth — hand-write split honored, then explicitly relaxed partway through** (Muneera's own call, same pattern as the Phase 2→fast-pace shift): `POST /api/auth/register` (hashing + insert) was hand-written with the bcrypt concept walkthrough first (salting, work factor — see GLOSSARY.md's new Authentication section). Muneera then asked to move fast for the rest — `POST /api/auth/login`, `get_current_user`, and `get_owned_vehicle_or_404` were Claude-written with only brief inline explanations rather than the full walkthrough treatment. Worth being honest about in an interview: the addendum called for hand-writing all four; only the first one actually was.
+
+- JWT in an **httpOnly cookie**, 7-day expiry, no refresh token (both per the locked-in decisions — see 3.7 below).
+- `get_owned_vehicle_or_404` returns 404, not 403, on a vehicle that exists but belongs to someone else — deliberately doesn't confirm the ID is real.
+- `get_service_or_404` was tightened beyond the addendum's literal spec to also check the service belongs to the `vehicle_id` in the URL, not just that the service exists — otherwise a user could edit another user's service record by guessing its ID while going through a vehicle they *do* own. Caught and fixed during the retrofit, not shipped as a gap.
+- All Phase 2 endpoints restructured under `/api/vehicles/{vehicle_id}/...` (previously `/api/vehicle`, `/api/schedule`, `/api/services` assumed a single hardcoded vehicle — those paths no longer exist). New `GET/POST /api/vehicles`, `DELETE /api/vehicles/{id}`.
+- Frontend: `AuthForm.jsx` (login/register), `Garage.jsx` (vehicle switcher + add-vehicle form), `App.jsx` rewired around an auth-check → vehicle-list → vehicle-scoped-data flow.
+
+**Email verification + password reset via AWS SES** (sandbox mode, Muneera's own verified address): `email_utils.py` (boto3 SES wrapper, HTML+text templates for both), verify-email auto-sent on register, `GET /api/auth/verify-email` (returns HTML, not JSON — a human clicks this from their inbox), `POST /api/auth/forgot-password` (uniform response regardless of whether the email exists — same anti-enumeration principle as login's uniform 401), `POST /api/auth/reset-password`. Frontend: a third "forgot password" mode in `AuthForm.jsx`, new `ResetPasswordForm.jsx`, `App.jsx` detects `?reset_token=` in the URL regardless of login state.
+
+Three real bugs caught and fixed during testing (logged in full in JOURNAL.md, Session 7):
+1. **AWS access key exposed in chat mid-project** — rotated immediately (same lesson as the Session 1 GitHub PAT incident: any secret visible outside its intended prompt is compromised, no exceptions).
+2. **SES region mismatch** — the SES console showed the identity as "Verified" while displaying a different region than the app's `us-east-1`; SES verification is per-region, not account-wide.
+3. **Import-order env bug** — `email_utils.py` read `os.getenv()` at import time but was imported before `database.py` (which calls `load_dotenv()`) in `main.py`, so the real running server silently sent every email with `Source=None` while standalone test scripts happened to mask it via a different import order. A bare `except Exception: pass` around the SES calls hid this completely until logging was added. Fixed by having `email_utils.py` load its own environment rather than depending on import order elsewhere.
+
+**Checkpoint verified directly against the API** (not just the UI): two disposable test accounts confirmed fully isolated from each other *and* from Muneera's real vehicle data — cross-account 404s on vehicles, services, and nested service records; no/garbage/expired token all correctly 401; single-use enforcement on both verify-email and reset-password tokens; a full reset-password cycle (old password rejected, new password works) completed on a disposable account so Muneera's real password was never touched by Claude. 14/14 Phase 4 tests passed throughout, including after two real regressions were caught and fixed (`bcrypt`/`passlib` version incompatibility from a routine dependency install, and the accidental backend-process kill described in this session's setup notes).
+
+Committed as `e69d417`. Immediate next step: **Phase 5 (S3 receipts)**, object keys ownership-scoped per this addendum's Section 5.2 — see that section before writing any Phase 5 code.
+
+### 🔲 Phase 5 — Receipt Photo Uploads (S3) — NOT STARTED CODING YET
+
+AWS setup status, updated as of Phase 4.5 (the account/IAM state below carried over and is now confirmed, since Phase 4.5's SES work exercised the same account):
+
+- Muneera's own personal AWS account (deliberately NOT her dad's — see below), account `224603709350`.
+- Billing alert/CloudWatch alarm was explicitly SKIPPED at Muneera's request ("let's just ignore this"). Do not assume a billing alarm exists. If cost ever becomes a concern later, this is unfinished/available to revisit.
+- IAM user `autoassist-dev` **confirmed created and working** (`aws sts get-caller-identity` verified during Phase 4.5) — it currently has an SES-send-scoped inline policy (`ses:SendEmail`, `ses:SendRawEmail` only) attached for the email work. It will need an S3 policy added (scoped to the specific bucket, not `AmazonS3FullAccess`) before Phase 5 endpoints can use it.
+- A real mid-project incident: an AWS access key was accidentally exposed in chat and immediately rotated (revoked + regenerated) — see JOURNAL.md Session 7 and HANDOFF §3.7. `aws configure` on the primary laptop currently holds the rotated key.
+- AWS CLI is installed (`aws-cli/2.36.14`) and `aws configure` has been run — credentials work, confirmed via `aws sts get-caller-identity`.
 - No S3 bucket has been created yet.
-- No backend code for Phase 5 has been written yet — Claude Code had only explained the plan (4 parts: pre-signed-URL upload flow via `POST /api/services/{id}/receipt-upload-url`, frontend file input + thumbnail, content-type/size validation, private bucket) but had not started building.
+- No backend code for Phase 5 has been written yet. Per `AUTOASSIST_ADDENDUM_PHASE_4_5_AUTH.md` §5.2, object keys must be ownership-scoped from the start: `users/{user_id}/vehicles/{vehicle_id}/receipts/{service_id}/{filename}`, not a flat scheme — this wasn't true when the original Phase 5 plan below was written (pre-dates Phase 4.5's multi-tenancy).
 
 Exact next steps for Phase 5, in order:
 

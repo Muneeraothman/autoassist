@@ -128,3 +128,24 @@ Needed re-teaching:
 **Full-loop checkpoint (via actual browser automation, not just curl):** updated mileage on the vehicle card → confirmed the average recalculated correctly → logged a service (pre-filled mileage matched the just-updated value) → saw it appear at the top of Service History → refreshed the page → data was still there, confirming it's really coming from Postgres and not just sitting in React state. No console errors.
 
 **Gotchas:** none new this session beyond the mileage pre-fill bug above — DB reset (`docker exec` + schema drop, from Session 5) worked cleanly on the first try this time.
+
+---
+
+## Session 7 — Phase 4.5: Multi-User Auth, Email Verification, Password Reset (2026-08-03)
+
+**What I did:**
+- Added multi-user auth: `users` table, `vehicles.user_id`, JWT stored in an httpOnly cookie (7-day expiry, no refresh token — kept intentionally simple for a portfolio project's scope), password hashing with bcrypt via passlib.
+- Wrote the core security-critical pieces myself with Claude explaining concepts first: the bcrypt hashing/insert logic in `POST /api/auth/register`, and (once I asked to move faster) `POST /api/auth/login`, the `get_current_user` dependency, and `get_owned_vehicle_or_404` — the actual ownership boundary, returns 404 rather than 403 so a vehicle ID belonging to someone else doesn't even reveal it exists.
+- Had Claude retrofit every existing endpoint to require auth and live under `/api/vehicles/{vehicle_id}/...`, add new vehicle CRUD endpoints, and build the login/register/garage frontend.
+- Set up AWS SES for real email sending (sandbox mode, my own verified email address) and had Claude build email verification and password reset on top of it.
+
+**What I learned:**
+- httpOnly cookies vs. an `Authorization` header for a JWT — httpOnly means client-side JS can never read the token (defends against XSS token theft), but it also means the browser sends it automatically on same-origin requests, so the backend reads it via `Request.cookies`, not a header.
+- Why bcrypt is deliberately slow (the "work factor") and why every password gets its own random salt instead of one shared secret for the whole app — defeats both brute-forcing and precomputed rainbow-table lookups.
+- Verification/reset tokens are deliberately NOT JWTs — they're random DB-backed tokens (`secrets.token_urlsafe`) with a `used_at` column, because they need to be single-use and revocable, which a stateless JWT can't do without extra tracked state anyway.
+
+**Gotchas / things that took longer than expected:**
+- **AWS access key exposed in chat, mid-project.** Rotated it immediately (revoked the old key, generated a new one) — same lesson as the GitHub Personal Access Token in Session 1: any secret typed somewhere other than its intended prompt is compromised the moment it's visible, no exceptions, rotate first and ask questions later.
+- **SES region mismatch.** My email identity showed "Verified" in the SES console, but sending still failed with `MessageRejected: Email address is not verified`. The console was displaying a different AWS region than the one the app was actually configured to send from (`us-east-1`) — SES identity verification is per-region, not account-wide, which isn't obvious from the console UI alone.
+- **A real "worked in testing, silently broken for real" bug.** The email-sending module read its config (`SES_SENDER_EMAIL`, etc.) from environment variables at import time, but got imported *before* the other module that actually loads the `.env` file — so the real running server was silently sending every email with `Source=None`, while a standalone test script happened to import things in an order that accidentally loaded `.env` first and masked the bug completely. Fixed by having the email module load its own environment instead of depending on some other file being imported first — a good example of why implicit import-order dependencies are dangerous.
+- **A silent `except: pass` around the email-sending calls was hiding the bug above.** It existed so a real-world SES sandbox restriction (can't email unverified addresses) wouldn't block account registration entirely — a reasonable intent — but with zero logging it also swallowed the actual `Source=None` bug without a trace. Added a log line before retesting, and the real cause showed up immediately. Lesson: "best-effort, don't block on this" is a reasonable design choice, but it should never mean "silent" — always log what got swallowed.
