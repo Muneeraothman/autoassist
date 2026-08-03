@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hfTfVb5QmhWxpvPCohsDBuCfaEPQ6kGkAgBWifBuVHt6KfzvjyoqjK2XeTsgqht
+\restrict jpbeqdDNiM6Ep0cLAa9dUknehy6Qj11We2o0AxlshfYem3m2nAolZUVbV17uMbD
 
 -- Dumped from database version 16.14 (Debian 16.14-1.pgdg13+1)
 -- Dumped by pg_dump version 16.14 (Debian 16.14-1.pgdg13+1)
@@ -21,6 +21,44 @@ SET row_security = off;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
+
+--
+-- Name: email_tokens; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.email_tokens (
+    id integer NOT NULL,
+    user_id integer NOT NULL,
+    token text NOT NULL,
+    token_type text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    used_at timestamp with time zone
+);
+
+
+ALTER TABLE public.email_tokens OWNER TO postgres;
+
+--
+-- Name: email_tokens_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.email_tokens_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.email_tokens_id_seq OWNER TO postgres;
+
+--
+-- Name: email_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.email_tokens_id_seq OWNED BY public.email_tokens.id;
+
 
 --
 -- Name: schedule_items; Type: TABLE; Schema: public; Owner: postgres
@@ -103,6 +141,43 @@ ALTER SEQUENCE public.service_records_id_seq OWNED BY public.service_records.id;
 
 
 --
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    email text NOT NULL,
+    hashed_password text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    email_verified boolean DEFAULT false NOT NULL
+);
+
+
+ALTER TABLE public.users OWNER TO postgres;
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.users_id_seq OWNER TO postgres;
+
+--
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
 -- Name: vehicles; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -114,7 +189,8 @@ CREATE TABLE public.vehicles (
     vin text,
     current_mileage integer NOT NULL,
     mileage_updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    avg_miles_per_day numeric(6,2) DEFAULT 30.0
+    avg_miles_per_day numeric(6,2) DEFAULT 30.0,
+    user_id integer NOT NULL
 );
 
 
@@ -143,6 +219,13 @@ ALTER SEQUENCE public.vehicles_id_seq OWNED BY public.vehicles.id;
 
 
 --
+-- Name: email_tokens id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.email_tokens ALTER COLUMN id SET DEFAULT nextval('public.email_tokens_id_seq'::regclass);
+
+
+--
 -- Name: schedule_items id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -157,10 +240,28 @@ ALTER TABLE ONLY public.service_records ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
 -- Name: vehicles id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.vehicles ALTER COLUMN id SET DEFAULT nextval('public.vehicles_id_seq'::regclass);
+
+
+--
+-- Data for Name: email_tokens; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.email_tokens VALUES (1, 2, 'oIl8MV-YIDOAaVRbKnJ7yhtS-DY31IDzW08uJBK2w_M', 'verify_email', '2026-08-04 04:36:27.228896+00', NULL);
+INSERT INTO public.email_tokens VALUES (2, 2, 'm4teoNrxTnajuzmWs8wEOmVlUDEFATFuX3yK3eyBjAM', 'verify_email', '2026-08-04 05:01:52.400677+00', '2026-08-03 05:02:05.870531+00');
+INSERT INTO public.email_tokens VALUES (3, 2, 'im2r8jBKVr8KF9fKL8KzQmmJmJRJJIQqoNK9LWAQcu4', 'reset_password', '2026-08-03 06:02:33.386618+00', NULL);
+INSERT INTO public.email_tokens VALUES (4, 2, 'lBsgTFiPsf2SAt4Xkc5BWh5bNlOtQzwLc6etZOOIWP4', 'reset_password', '2026-08-03 06:03:24.085959+00', NULL);
+INSERT INTO public.email_tokens VALUES (5, 2, 'XbtU-GDl-WAO9jj4PfKywyssrLUXMhe9b-o-w6l-hGA', 'reset_password', '2026-08-03 06:04:31.985992+00', NULL);
 
 
 --
@@ -201,10 +302,24 @@ INSERT INTO public.service_records VALUES (16, 2, 8, '2026-06-06', 58410, 82.99,
 
 
 --
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+INSERT INTO public.users VALUES (2, 'muneera0615@gmail.com', '$2b$12$F4Iwh0ddsJPriIuvsLjN7.oYqRnFwi59qO1HVrjA1UwSG/umn2yYi', '2026-08-03 03:06:20.72564+00', true);
+
+
+--
 -- Data for Name: vehicles; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-INSERT INTO public.vehicles VALUES (2, 'Lexus', 'ES300', 2002, NULL, 164784, '2026-07-24 00:36:22.405339+00', 30.00);
+INSERT INTO public.vehicles VALUES (2, 'Lexus', 'ES300', 2002, NULL, 164784, '2026-07-24 00:36:22.405339+00', 30.00, 2);
+
+
+--
+-- Name: email_tokens_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.email_tokens_id_seq', 9, true);
 
 
 --
@@ -218,14 +333,37 @@ SELECT pg_catalog.setval('public.schedule_items_id_seq', 16, true);
 -- Name: service_records_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.service_records_id_seq', 16, true);
+SELECT pg_catalog.setval('public.service_records_id_seq', 18, true);
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.users_id_seq', 8, true);
 
 
 --
 -- Name: vehicles_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.vehicles_id_seq', 2, true);
+SELECT pg_catalog.setval('public.vehicles_id_seq', 6, true);
+
+
+--
+-- Name: email_tokens email_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.email_tokens
+    ADD CONSTRAINT email_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: email_tokens email_tokens_token_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.email_tokens
+    ADD CONSTRAINT email_tokens_token_key UNIQUE (token);
 
 
 --
@@ -245,11 +383,35 @@ ALTER TABLE ONLY public.service_records
 
 
 --
+-- Name: users users_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_email_key UNIQUE (email);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: vehicles vehicles_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.vehicles
     ADD CONSTRAINT vehicles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: email_tokens email_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.email_tokens
+    ADD CONSTRAINT email_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
 
 
 --
@@ -277,8 +439,16 @@ ALTER TABLE ONLY public.service_records
 
 
 --
+-- Name: vehicles vehicles_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.vehicles
+    ADD CONSTRAINT vehicles_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hfTfVb5QmhWxpvPCohsDBuCfaEPQ6kGkAgBWifBuVHt6KfzvjyoqjK2XeTsgqht
+\unrestrict jpbeqdDNiM6Ep0cLAa9dUknehy6Qj11We2o0AxlshfYem3m2nAolZUVbV17uMbD
 

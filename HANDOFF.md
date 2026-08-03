@@ -197,11 +197,22 @@ Frontend: `ReceiptCell.jsx` (per-service-row file input or "View" button dependi
 
 One minor loose end: a tiny leftover test image sits in the bucket at `users/7/vehicles/6/receipts/18/receipt.png` — Claude couldn't delete it (see the no-`DeleteObject` policy note above), harmless, Muneera can remove it manually if she wants a pristine bucket.
 
-### 🔲 Phases 6–12 — NOT STARTED
+### ✅ Phase 6 — Dockerize + docker-compose (COMPLETE — "local MVP complete" milestone)
+
+Whole stack runs with `docker compose up --build`: `db` (Postgres 16, named volume `db_data`, auto-seeded from `seed.sql` via `docker-entrypoint-initdb.d` on first boot only — subsequent starts reuse the volume), `backend` (multi-stage-free `python:3.14-slim` image, waits for `db`'s healthcheck via `depends_on: condition: service_healthy`), `frontend` (multi-stage: Node build → static files served by nginx, which also reverse-proxies `/api/*` to the backend service — mirrors Vite's dev-time proxy so every component's relative `fetch('/api/...')` call keeps working unchanged).
+
+**Colima, not Docker Desktop** — this machine runs Colima as its Docker runtime (see the machine-context note at the top of this project's setup). Nothing in the compose file or Dockerfiles assumes Docker Desktop's GUI; `docker compose` (the CLI plugin, confirmed present under Colima) is all that's used.
+
+**A real, serious risk caught before it caused damage**: the `autoassist-db` container had been running since the very start of the project via a plain `docker run --name autoassist-db ...` with **no volume** — meaning Muneera's real data (her actual Lexus vehicle, her real user account, all Phase 4.5/5 auth and token data) existed only in that container's writable layer. Removing/replacing it for the compose migration would have destroyed it permanently. Caught and handled correctly: regenerated `seed.sql` from the live database first (the committed version was badly stale — predated the entire `users`/`email_tokens`/`vehicles.user_id` schema from Phase 4.5), verified row counts matched exactly and the dump wasn't truncated, *then* removed the old container. The new named-volume setup means this specific risk can't recur — data now survives container removal by design.
+
+**AWS credentials inside the container**: `~/.aws` mounted read-only into the `backend` service so `boto3` finds credentials via the same default chain `aws configure` already set up on the host — Claude never read or copied the actual key values, just added the mount path.
+
+**Checkpoint verified thoroughly, not just "it started"**: full `docker compose up --build` from a genuinely clean state (old non-volume container removed, fresh volume created, auto-seed exercised for real) — all three containers reported healthy/started, real data confirmed present with exact matching row counts, a full register → cookie → authenticated `/api/auth/me` request round-tripped correctly through nginx's proxy, and `boto3` confirmed working inside the container via a live `sts.get_caller_identity()` call. Also tested the more common real-world case — `docker compose down` (containers removed, volume kept) then `docker compose up` again — data persisted correctly, proving the volume genuinely works and the first test wasn't just a fluke of the initial auto-seed.
+
+### 🔲 Phases 7–12 — NOT STARTED
 
 Per the original build guide:
 
-- **Phase 6:** Dockerize + docker-compose (whole stack, one command). Milestone: "local MVP complete."
 - **Phase 7:** Deploy to AWS via Terraform (EC2 + RDS + existing S3 + security groups). This will need real, careful AWS credential handling again, same caution as Phase 5. Cost note from the guide: ~$25–30/mo if outside free tier — worth flagging to Muneera explicitly before this phase, given her Phase 5 reaction to even hypothetical billing risk.
 - **Phase 8:** CI/CD via GitHub Actions.
 - **Phase 9:** Email reminders via EventBridge + Lambda + SES.
@@ -213,9 +224,11 @@ Per the original build guide:
 
 This project has been actually tested, not just theoretically documented, running on a second physical laptop (Muneera's dad's, with his explicit permission) from a fresh git clone — full stack (backend + frontend + real database) confirmed working end-to-end, matching the primary laptop exactly.
 
-**What's in Git (safe, portable):** all backend code, all frontend code, `manuals/` (both Lexus PDFs + the stale Honda one), `seed.sql` (full schema + real data, regenerated via `docker exec autoassist-db pg_dump -U postgres -d autoassist --inserts > seed.sql` whenever the data changes), `backend/requirements.txt`, `frontend/package.json` (dependencies, not `node_modules`), CLAUDE.md, GLOSSARY.md, JOURNAL.md, LEARNING_PROCESS.md, AUTOASSIST_BUILD_GUIDE.md.
+**What's in Git (safe, portable):** all backend code, all frontend code, `manuals/` (both Lexus PDFs + the stale Honda one), `seed.sql` (full schema + real data, regenerated via `docker exec autoassist-db pg_dump -U postgres -d autoassist --inserts > seed.sql` whenever the data changes meaningfully), `backend/requirements.txt`, `frontend/package.json` (dependencies, not `node_modules`), `backend/Dockerfile`, `frontend/Dockerfile` + `nginx.conf`, `docker-compose.yml`, CLAUDE.md, GLOSSARY.md, JOURNAL.md, LEARNING_PROCESS.md, AUTOASSIST_BUILD_GUIDE.md.
 
-**What's NOT in Git (by design, must be recreated per-machine):** `backend/.env` (holds the DB password — recreated via one `echo` command), `backend/venv/` (rebuilt via `pip install -r requirements.txt`), `frontend/node_modules/` (rebuilt via `npm install`), the actual Postgres container/data (rebuilt via `docker run` + loading `seed.sql`), Claude Code's own login (must re-authenticate per machine, `claude` → `/login`).
+**What's NOT in Git (by design, must be recreated per-machine):** `backend/.env` (holds secrets — DB password, JWT signing key, SES/S3 config; recreated by hand per `.env.example`), `backend/venv/` and `frontend/node_modules/` (only relevant for the manual/non-Docker dev workflow — rebuilt via `pip install -r requirements.txt` / `npm install`), Claude Code's own login (must re-authenticate per machine, `claude` → `/login`).
+
+**As of Phase 6, running the whole stack no longer requires the manual per-service setup at all** — `docker compose up --build` handles Postgres (auto-seeded from `seed.sql` on first run), the backend, and the frontend together, and reads secrets from `backend/.env` via `env_file`. The manual `venv`/`node_modules`/`docker run` workflow described in Section 4's Phase 0 checkpoint still works and remains useful for fast local iteration (hot reload), but is no longer the only — or the primary — way to stand the project up on a fresh machine.
 
 Full fresh-machine setup sequence (confirmed accurate, actually executed once successfully):
 
