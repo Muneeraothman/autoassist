@@ -25,17 +25,17 @@ function formatDueText(entry) {
   return parts.length > 0 ? parts.join(' / ') : 'No projection available'
 }
 
-function UpcomingMaintenance({ refreshKey }) {
+function UpcomingMaintenance({ vehicleId, refreshKey }) {
   const [items, setItems] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    fetch('/api/upcoming')
+    fetch(`/api/vehicles/${vehicleId}/upcoming`, { credentials: 'include' })
       .then((res) => res.json())
       .then(setItems)
       .finally(() => setLoading(false))
-  }, [refreshKey])
+  }, [vehicleId, refreshKey])
 
   return (
     <section className="card">

@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react'
 
-function ServiceHistory({ scheduleItems, refreshKey }) {
+function ServiceHistory({ vehicleId, scheduleItems, refreshKey }) {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
 
   useEffect(() => {
     setLoading(true)
-    const url = filter ? `/api/services?schedule_item_id=${filter}` : '/api/services'
-    fetch(url)
+    const base = `/api/vehicles/${vehicleId}/services`
+    const url = filter ? `${base}?schedule_item_id=${filter}` : base
+    fetch(url, { credentials: 'include' })
       .then((res) => res.json())
       .then(setServices)
       .finally(() => setLoading(false))
-  }, [filter, refreshKey])
+  }, [vehicleId, filter, refreshKey])
 
   function nameForScheduleItem(id) {
     const item = scheduleItems.find((i) => i.id === id)

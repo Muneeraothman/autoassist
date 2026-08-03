@@ -4,7 +4,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-function LogServiceForm({ scheduleItems, currentMileage, onServiceLogged }) {
+function LogServiceForm({ vehicleId, scheduleItems, currentMileage, onServiceLogged }) {
   const [scheduleItemId, setScheduleItemId] = useState('')
   const [serviceDate, setServiceDate] = useState(todayISO)
   const [mileage, setMileage] = useState('')
@@ -28,9 +28,10 @@ function LogServiceForm({ scheduleItems, currentMileage, onServiceLogged }) {
     setError(null)
     setSuccess(false)
     try {
-      const res = await fetch('/api/services', {
+      const res = await fetch(`/api/vehicles/${vehicleId}/services`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           schedule_item_id: scheduleItemId === '' ? null : Number(scheduleItemId),
           service_date: serviceDate,

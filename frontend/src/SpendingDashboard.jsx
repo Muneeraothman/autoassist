@@ -21,17 +21,17 @@ const tooltipStyle = {
   color: 'var(--text-h)',
 }
 
-function SpendingDashboard({ refreshKey }) {
+function SpendingDashboard({ vehicleId, refreshKey }) {
   const [stats, setStats] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     setLoading(true)
-    fetch('/api/stats')
+    fetch(`/api/vehicles/${vehicleId}/stats`, { credentials: 'include' })
       .then((res) => res.json())
       .then(setStats)
       .finally(() => setLoading(false))
-  }, [refreshKey])
+  }, [vehicleId, refreshKey])
 
   if (loading) {
     return (

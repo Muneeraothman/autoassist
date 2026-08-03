@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-function VehicleCard({ vehicle, loading, onMileageUpdated }) {
+function VehicleCard({ vehicle, vehicleId, loading, onMileageUpdated }) {
   const [mileageInput, setMileageInput] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
@@ -26,9 +26,10 @@ function VehicleCard({ vehicle, loading, onMileageUpdated }) {
     setSubmitting(true)
     setError(null)
     try {
-      const res = await fetch('/api/vehicle/mileage', {
+      const res = await fetch(`/api/vehicles/${vehicleId}/mileage`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ mileage: Number(mileageInput) }),
       })
       const data = await res.json()

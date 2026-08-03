@@ -177,3 +177,15 @@ Plain-English explanations of every term as I encounter it. No jargon assumed.
 **Maintenance code** — The letter/number Honda uses to label a bundle of services (e.g. Code A = oil change only, Code B = oil change + filter + brake inspection + more, Code 1 = rotate tires). Historical/Honda-specific — see note above.
 
 **Fixed maintenance interval** — The Lexus's (and most other brands') approach to maintenance scheduling: the owner's manual lists a straightforward table of services due at specific mileage/time marks (e.g. "replace every 30,000 miles or 24 months"), instead of Honda's adaptive Maintenance Minder system. Simpler to model in the database — no live oil-life calculation needed, just mileage/date math against a fixed table.
+
+---
+
+## Authentication (Phase 4.5)
+
+**Hashing** — A one-way scramble of data into a fixed-length string. Like blending a strawberry into a smoothie: you can't un-blend the smoothie back into the strawberry, but blending the *same* strawberry the *same* way always produces the *same* smoothie (deterministic). Used for passwords so the raw password is never stored — only its hash.
+
+**Salt** — A random string mixed into a password before hashing, unique per password. Without it, two users with the same password would produce identical hashes, which is itself a leak (an attacker with a table of "common password → hash" could look yours up directly — a "rainbow table" attack). The salt doesn't need to be kept secret; bcrypt stores it right alongside the hash. Its job is uniqueness, not secrecy.
+
+**Work factor (a.k.a. cost / rounds)** — A tunable "how slow should this be on purpose" knob on bcrypt. A fast hash can be computed millions of times per second, which makes brute-forcing a stolen password database practical. bcrypt deliberately takes ~100-300ms per hash instead, controlled by the work factor — invisible to a real user logging in once, but it turns "try a billion password guesses" into a computationally impractical task. As hardware gets faster over the years, the work factor gets bumped up rather than switching hash algorithms entirely.
+
+**bcrypt** — The specific slow, salted hashing algorithm used for passwords in this project (via the `passlib` library). Not to be confused with general-purpose hash functions like SHA-256, which are fast by design and wrong for passwords for exactly that reason.

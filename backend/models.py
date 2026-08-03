@@ -1,12 +1,34 @@
-from sqlalchemy import Column, Integer, String, Numeric, DateTime, Date, ForeignKey, Text
+from sqlalchemy import Boolean, Column, Integer, String, Numeric, DateTime, Date, ForeignKey, Text
 from sqlalchemy.sql import func
 from database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    email = Column(Text, nullable=False, unique=True)
+    hashed_password = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    email_verified = Column(Boolean, nullable=False, default=False)
+
+
+class EmailToken(Base):
+    __tablename__ = "email_tokens"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    token = Column(Text, nullable=False, unique=True)
+    token_type = Column(Text, nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    used_at = Column(DateTime(timezone=True))
 
 
 class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     make = Column(Text, nullable=False)
     model = Column(Text, nullable=False)
     year = Column(Integer, nullable=False)
