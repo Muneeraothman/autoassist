@@ -183,27 +183,19 @@ Three real bugs caught and fixed during testing (logged in full in JOURNAL.md, S
 
 Committed as `e69d417`. Immediate next step: **Phase 5 (S3 receipts)**, object keys ownership-scoped per this addendum's Section 5.2 — see that section before writing any Phase 5 code.
 
-### 🔲 Phase 5 — Receipt Photo Uploads (S3) — NOT STARTED CODING YET
+### ✅ Phase 5 — Receipt Photo Uploads (S3) — COMPLETE
 
-AWS setup status, updated as of Phase 4.5 (the account/IAM state below carried over and is now confirmed, since Phase 4.5's SES work exercised the same account):
+Bucket `autoassist-receipts-224603709350` (`us-east-1`), created by Muneera directly (console), public access blocked. `autoassist-dev` has a second scoped inline policy for it (`s3:PutObject`, `s3:GetObject` only, resource-restricted to that bucket — no `s3:DeleteObject`, confirmed during testing when Claude's own cleanup attempt correctly got `AccessDenied`).
 
-- Muneera's own personal AWS account (deliberately NOT her dad's — see below), account `224603709350`.
-- Billing alert/CloudWatch alarm was explicitly SKIPPED at Muneera's request ("let's just ignore this"). Do not assume a billing alarm exists. If cost ever becomes a concern later, this is unfinished/available to revisit.
-- IAM user `autoassist-dev` **confirmed created and working** (`aws sts get-caller-identity` verified during Phase 4.5) — it currently has an SES-send-scoped inline policy (`ses:SendEmail`, `ses:SendRawEmail` only) attached for the email work. It will need an S3 policy added (scoped to the specific bucket, not `AmazonS3FullAccess`) before Phase 5 endpoints can use it.
-- A real mid-project incident: an AWS access key was accidentally exposed in chat and immediately rotated (revoked + regenerated) — see JOURNAL.md Session 7 and HANDOFF §3.7. `aws configure` on the primary laptop currently holds the rotated key.
-- AWS CLI is installed (`aws-cli/2.36.14`) and `aws configure` has been run — credentials work, confirmed via `aws sts get-caller-identity`.
-- No S3 bucket has been created yet.
-- No backend code for Phase 5 has been written yet. Per `AUTOASSIST_ADDENDUM_PHASE_4_5_AUTH.md` §5.2, object keys must be ownership-scoped from the start: `users/{user_id}/vehicles/{vehicle_id}/receipts/{service_id}/{filename}`, not a flat scheme — this wasn't true when the original Phase 5 plan below was written (pre-dates Phase 4.5's multi-tenancy).
+Pre-signed PUT/GET flow, exactly as the original guide's architecture note recommends (backend never proxies image bytes — no bandwidth/memory pressure, S3 handles the transfer directly): `backend/s3_utils.py`, `POST /api/vehicles/{vehicle_id}/services/{service_id}/receipt-upload-url` and `GET .../receipt-url`, both behind `get_owned_vehicle_or_404` + `get_service_or_404`. Object keys ownership-scoped per the addendum's §5.2: `users/{user_id}/vehicles/{vehicle_id}/receipts/{service_id}/receipt.{ext}`.
 
-Exact next steps for Phase 5, in order:
+**Content-type handled via a fixed server-side allowlist** (`image/jpeg`, `image/png`, `image/webp`, `image/heic`, `image/heif` → their extensions), not a client-provided filename. Worth knowing as a real security catch, not just a design preference: an earlier draft would have taken the filename from the upload request and used it directly in the S3 key — that's a path-traversal-style injection vector (a filename like `../../../whatever` could escape the intended key prefix and write outside the ownership-scoped path). Caught before it shipped.
 
-1. Confirm/finish IAM user + access keys (check IAM console directly — don't assume).
-2. Run `aws configure` in a terminal (NOT inside the Claude Code chat window — same "typed vs. actually executed" gotcha as git, see Section 7.4) and enter the Access Key ID / Secret Access Key privately at the interactive prompts. A reasonable default region is `us-east-1` unless Muneera has a preference.
-3. Create a private S3 bucket (block public access ON — this is an explicit checkpoint in the build guide: "confirm the bucket is not publicly readable").
-4. Backend: pre-signed PUT URL endpoint, pre-signed GET URL endpoint for viewing. Do not proxy raw image bytes through the FastAPI backend — this is called out in the original guide as a deliberate architecture/teaching point worth explaining (why pre-signed URLs beat proxying: no backend bandwidth/memory pressure, no need to buffer large files, S3 handles the actual transfer).
-5. Frontend: file input on the service log form, thumbnail/link in service history.
-6. Validate content-type (images only) and file size cap on the frontend and/or backend.
-7. Checkpoint from the original guide, worth actually doing: upload a real receipt photo, refresh the page, view it from history. Separately confirm the bucket itself is not publicly readable (e.g., try the raw S3 URL without a pre-signed token and confirm it's rejected).
+Frontend: `ReceiptCell.jsx` (per-service-row file input or "View" button depending on whether `receipt_key` is set), wired into `ServiceHistory.jsx`'s new Receipt column. 5MB client-side size cap; no server-side size enforcement yet (would need a pre-signed POST with policy conditions rather than a simple pre-signed PUT — noted as a real, known gap rather than silently skipped).
+
+**Checkpoint fully done, for real** (not just code review): uploaded a genuine PNG through the presigned PUT URL, downloaded it back through the presigned GET URL, confirmed byte-for-byte identical. Confirmed the bucket is truly private — the raw S3 URL without a presigned token returns 403. Cross-account isolation confirmed on both new endpoints (404, not just wrong data). Content-type rejection confirmed for a non-image type. All done against disposable test accounts, never Muneera's real vehicle.
+
+One minor loose end: a tiny leftover test image sits in the bucket at `users/7/vehicles/6/receipts/18/receipt.png` — Claude couldn't delete it (see the no-`DeleteObject` policy note above), harmless, Muneera can remove it manually if she wants a pristine bucket.
 
 ### 🔲 Phases 6–12 — NOT STARTED
 
