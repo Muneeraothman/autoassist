@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 import email_utils
+import s3_utils
 from database import get_db
 from engine import get_upcoming_maintenance
 from models import EmailToken, User, Vehicle, ScheduleItem, ServiceRecord
@@ -94,6 +95,18 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=8)
+
+
+class ReceiptUploadRequest(BaseModel):
+    content_type: str
+
+    @field_validator("content_type")
+    @classmethod
+    def validate_image_content_type(cls, value):
+        if value not in s3_utils.CONTENT_TYPE_EXTENSIONS:
+            allowed = ", ".join(s3_utils.CONTENT_TYPE_EXTENSIONS)
+            raise ValueError(f"Unsupported content type. Allowed: {allowed}")
+        return value
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
@@ -518,3 +531,40 @@ def delete_service(
     record = get_service_or_404(db, vehicle_id, service_id)
     db.delete(record)
     db.commit()
+
+
+@app.post("/api/vehicles/{vehicle_id}/services/{service_id}/receipt-upload-url")
+def get_receipt_upload_url(
+    vehicle_id: int,
+    service_id: int,
+    payload: ReceiptUploadRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_owned_vehicle_or_404(db, vehicle_id, current_user)
+    record = get_service_or_404(db, vehicle_id, service_id)
+
+    extension = s3_utils.CONTENT_TYPE_EXTENSIONS[payload.content_type]
+    key = s3_utils.build_receipt_key(current_user.id, vehicle_id, service_id, extension)
+    upload_url = s3_utils.generate_upload_url(key, payload.content_type)
+
+    record.receipt_key = key
+    db.commit()
+
+    return {"upload_url": upload_url, "key": key}
+
+
+@app.get("/api/vehicles/{vehicle_id}/services/{service_id}/receipt-url")
+def get_receipt_view_url(
+    vehicle_id: int,
+    service_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    get_owned_vehicle_or_404(db, vehicle_id, current_user)
+    record = get_service_or_404(db, vehicle_id, service_id)
+
+    if record.receipt_key is None:
+        raise HTTPException(status_code=404, detail="No receipt uploaded for this service")
+
+    return {"url": s3_utils.generate_view_url(record.receipt_key)}

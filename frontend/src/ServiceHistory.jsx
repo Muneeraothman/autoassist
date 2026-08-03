@@ -1,19 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import ReceiptCell from './ReceiptCell'
 
 function ServiceHistory({ vehicleId, scheduleItems, refreshKey }) {
   const [services, setServices] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('')
 
-  useEffect(() => {
+  const fetchServices = useCallback(() => {
     setLoading(true)
     const base = `/api/vehicles/${vehicleId}/services`
     const url = filter ? `${base}?schedule_item_id=${filter}` : base
-    fetch(url, { credentials: 'include' })
+    return fetch(url, { credentials: 'include' })
       .then((res) => res.json())
       .then(setServices)
       .finally(() => setLoading(false))
-  }, [vehicleId, filter, refreshKey])
+  }, [vehicleId, filter])
+
+  useEffect(() => {
+    fetchServices()
+  }, [fetchServices, refreshKey])
 
   function nameForScheduleItem(id) {
     const item = scheduleItems.find((i) => i.id === id)
@@ -48,6 +53,7 @@ function ServiceHistory({ vehicleId, scheduleItems, refreshKey }) {
               <th>Cost</th>
               <th>Performed by</th>
               <th>Notes</th>
+              <th>Receipt</th>
             </tr>
           </thead>
           <tbody>
@@ -59,6 +65,14 @@ function ServiceHistory({ vehicleId, scheduleItems, refreshKey }) {
                 <td>{service.cost != null ? `$${service.cost.toFixed(2)}` : '—'}</td>
                 <td>{service.performed_by || '—'}</td>
                 <td>{service.notes || '—'}</td>
+                <td>
+                  <ReceiptCell
+                    vehicleId={vehicleId}
+                    serviceId={service.id}
+                    hasReceipt={Boolean(service.receipt_key)}
+                    onUploaded={fetchServices}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
