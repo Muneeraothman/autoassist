@@ -41,7 +41,19 @@ variable "s3_receipts_bucket" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type. t3.small rather than t3.micro (the guide's suggestion) — deliberate: docker compose up --build runs a full Vite/npm build on the instance itself (Phase 8's pre-built-image pipeline doesn't exist yet), and t3.micro's 1GB RAM is genuinely tight for that."
+  description = "EC2 instance type. As of Phase 8, the instance pulls pre-built images from ECR rather than building locally, so t3.micro would work again — left at t3.small for now since it's already the proven-working size and the cost difference is small."
   type        = string
   default     = "t3.small"
+}
+
+variable "ecr_backend_repository_url" {
+  description = "ECR repository URL for the backend image (created in infra/bootstrap)"
+  type        = string
+  default     = "224603709350.dkr.ecr.us-east-1.amazonaws.com/autoassist-backend"
+}
+
+variable "ecr_frontend_repository_url" {
+  description = "ECR repository URL for the frontend image (created in infra/bootstrap)"
+  type        = string
+  default     = "224603709350.dkr.ecr.us-east-1.amazonaws.com/autoassist-frontend"
 }

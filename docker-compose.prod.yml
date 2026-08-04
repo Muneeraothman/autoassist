@@ -1,6 +1,6 @@
 services:
   backend:
-    build: ./backend
+    image: ${ECR_BACKEND_IMAGE}
     env_file:
       - ./backend/.env
     ports:
@@ -8,7 +8,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    image: ${ECR_FRONTEND_IMAGE}
     depends_on:
       - backend
     ports:

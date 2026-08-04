@@ -89,6 +89,30 @@ resource "aws_iam_role_policy" "ec2_s3" {
   })
 }
 
+resource "aws_iam_role_policy" "ec2_ecr" {
+  name = "autoassist-ec2-ecr-policy"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "ecr:GetAuthorizationToken"
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"]
+        Resource = [
+          "arn:aws:ecr:${var.aws_region}:224603709350:repository/autoassist-backend",
+          "arn:aws:ecr:${var.aws_region}:224603709350:repository/autoassist-frontend",
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "autoassist-ec2-profile"
   role = aws_iam_role.ec2.name
@@ -105,13 +129,16 @@ resource "aws_instance" "app" {
   key_name               = aws_key_pair.ec2.key_name
 
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
-    deploy_bucket    = var.s3_receipts_bucket
-    aws_region       = var.aws_region
-    db_password      = var.db_password
-    rds_endpoint     = aws_db_instance.main.endpoint
-    jwt_secret_key   = var.jwt_secret_key
-    ses_sender_email = var.ses_sender_email
-    s3_bucket_name   = var.s3_receipts_bucket
+    deploy_bucket      = var.s3_receipts_bucket
+    aws_region         = var.aws_region
+    db_password        = var.db_password
+    rds_endpoint       = aws_db_instance.main.endpoint
+    jwt_secret_key     = var.jwt_secret_key
+    ses_sender_email   = var.ses_sender_email
+    s3_bucket_name     = var.s3_receipts_bucket
+    ecr_backend_image  = "${var.ecr_backend_repository_url}:latest"
+    ecr_frontend_image = "${var.ecr_frontend_repository_url}:latest"
+    ecr_registry       = "224603709350.dkr.ecr.${var.aws_region}.amazonaws.com"
   })
 
   tags = {
