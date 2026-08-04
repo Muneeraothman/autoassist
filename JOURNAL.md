@@ -198,3 +198,22 @@ Needed re-teaching:
 
 **Gotchas / things that took longer than expected:**
 - **AWS security group description fields have a surprisingly strict character set** — no apostrophes, and ASCII only. Wrote "SSH from Muneera's IP only" and "...only — no direct internet access" (an em dash), and both failed `terraform apply` with a validation error partway through, after several other resources had already been created successfully. Small thing, but a good reminder that cloud APIs often have string-field restrictions that don't show up until you actually hit them.
+
+---
+
+## Session 11 — Phase 7 (part 2): RDS, EC2, Full Deploy, and the Destroy/Apply Cycle (2026-08-04)
+
+**What I did:**
+- Created RDS (private subnets, confirmed not publicly accessible from AWS's own API, not just assumed) and an EC2 instance with an IAM instance role instead of static keys, running the whole app via `docker compose up --build` inside a `user_data` boot script.
+- Got the app code onto the instance via an S3 tarball rather than a `git clone` from the private repo — sidesteps needing a GitHub deploy key for something Phase 8's real CI/CD pipeline will replace soon anyway.
+- Loaded the real seed data against RDS, then verified the actual deployed app from outside the VPC — registered a test account against the real public IP, full cookie-auth round trip through nginx.
+- Ran a genuine `terraform destroy` followed by `terraform apply` — the real IaC test — and confirmed this is now the standing pattern between work sessions, not a one-time thing.
+
+**What I learned:**
+- Why an EC2 instance role beats static access keys baked into user_data or an AMI: the credentials rotate automatically and are never actually visible as a string anywhere — confirmed this for real by running `sts.get_caller_identity()` from inside the deployed backend container and seeing `assumed-role/autoassist-ec2-role/...` come back, not a fixed access key ID.
+- Terraform's `templatefile()` function treats *every* `${...}` in a file as its own interpolation syntax needing a matching variable — including ones meant as plain bash variable references inside a shell script. Bash itself doesn't need the braces unless the variable name would otherwise run into surrounding text (`$VAR.suffix` already parses correctly, since `.` isn't a valid identifier character), so dropping them is the actual fix, not something Terraform can be told to ignore.
+
+**Gotchas / things that took longer than expected:**
+- **`docker compose build` failing with "requires buildx 0.17.0 or later"** on the very first deploy — Amazon Linux 2023's stock `docker` package doesn't include a modern buildx plugin. Fixed live over SSH to unblock verification (downloaded the buildx binary from GitHub releases directly), then folded the same fix into the `user_data` script so it wouldn't have to be done by hand again — verified this worked by actually running the full destroy/apply cycle afterward and watching it succeed with zero manual steps the second time.
+- **Immediately re-hit the exact templatefile/bash `${}` collision I'd already dodged once in the same file** — this time in the buildx-version variable I'd just added to fix the bug above. `terraform destroy` failed before doing anything, with a clear error naming the missing template variable, which made the actual cause easy to spot — but it's a good reminder that a pattern learned once in one spot doesn't automatically get applied to new code added later in the same file.
+- **An architecture question worth revisiting later, not urgent now**: the billing alarm lives in the same Terraform state as the compute resources, so it gets destroyed and recreated along with everything else on each destroy/apply cycle. Fine for now (nothing's running while torn down, so nothing needs alerting on), but if the destroy/apply gap itself ever needs alarm coverage, it'd need to move to somewhere that persists — the bootstrap module, most likely.
