@@ -128,6 +128,16 @@ resource "aws_instance" "app" {
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
   key_name               = aws_key_pair.ec2.key_name
 
+  # This AMI's default root volume is only 2GB - nowhere near enough once
+  # Docker is pulling two real images plus OS overhead. Hit "no space left
+  # on device" mid-pull on first apply after switching to the ECR-based
+  # deploy; 20GB gives real headroom without meaningfully changing cost
+  # (gp3 is ~$0.08/GB-mo, so this is under $2/mo).
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
+  }
+
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
     deploy_bucket      = var.s3_receipts_bucket
     aws_region         = var.aws_region

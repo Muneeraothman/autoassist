@@ -222,6 +222,18 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
     Version = "2012-10-17"
     Statement = [
       {
+        # DescribeInstances is a list/read action and doesn't support
+        # resource-level ARN scoping the way SendCommand below does - the
+        # deploy job's own filter (tag:Name=autoassist-app) is what actually
+        # narrows the result, not the IAM policy. Missed this permission
+        # entirely on the first pass; caught when "Find running instance"
+        # failed with UnauthorizedOperation even though ECR push had
+        # already succeeded via the same role.
+        Effect   = "Allow"
+        Action   = ["ec2:DescribeInstances"]
+        Resource = "*"
+      },
+      {
         Effect = "Allow"
         Action = ["ssm:SendCommand"]
         # Scoped by tag, not instance ID — the instance ID changes every
