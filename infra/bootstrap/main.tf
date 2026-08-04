@@ -138,9 +138,15 @@ data "tls_certificate" "github_actions" {
 }
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.github_actions.certificates[0].sha1_fingerprint]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  # AWS needs the ROOT CA's thumbprint, not the leaf (server) cert -
+  # certificates[0] is the leaf; the last entry in the chain is the root.
+  # Got this wrong on the first pass (used [0]) and hit
+  # "Not authorized to perform sts:AssumeRoleWithWebIdentity" in CD as a
+  # result - the trust policy's `sub` condition was correct, the OIDC
+  # provider's thumbprint just didn't match anything real.
+  thumbprint_list = [data.tls_certificate.github_actions.certificates[length(data.tls_certificate.github_actions.certificates) - 1].sha1_fingerprint]
 }
 
 resource "aws_iam_role" "github_actions_deploy" {
@@ -148,6 +154,15 @@ resource "aws_iam_role" "github_actions_deploy" {
 
   # Restricted to the main branch specifically — PR builds from branches or
   # forks never get AWS credentials, only a merge to main can assume this.
+  #
+  # The `sub` claim's actual format was a real surprise: GitHub embeds the
+  # owner's and repo's immutable numeric IDs alongside their names -
+  # "repo:Muneeraothman@307808101/autoassist@1308257599:ref:refs/heads/main"
+  # - not the simpler "repo:owner/repo:ref:refs/heads/branch" format most
+  # OIDC setup guides show (that was apparently an older format). Found this
+  # by adding a temporary debug step to cd.yml that decoded the actual JWT
+  # rather than guessing further after the thumbprint fix alone didn't
+  # resolve "Not authorized to perform sts:AssumeRoleWithWebIdentity".
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -160,7 +175,7 @@ resource "aws_iam_role" "github_actions_deploy" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:Muneeraothman/autoassist:ref:refs/heads/main"
+            "token.actions.githubusercontent.com:sub" = "repo:Muneeraothman@*/autoassist@*:ref:refs/heads/main"
           }
         }
       }
