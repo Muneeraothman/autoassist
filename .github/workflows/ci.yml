@@ -17,6 +17,15 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run tests
         working-directory: backend
+        # test_engine.py/test_stats.py test pure functions that never touch a
+        # real database, but they transitively import database.py (via
+        # models.py, just for the ORM class definitions), which calls
+        # create_engine(DATABASE_URL) at import time - with no real .env in
+        # CI (correctly, it's git-ignored), DATABASE_URL is unset and engine
+        # construction fails before any test runs. A syntactically-valid
+        # dummy URL satisfies create_engine() without ever being connected to.
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/unused
         run: pytest test_engine.py test_stats.py -v
 
   lint-and-build-frontend:
