@@ -181,3 +181,20 @@ Needed re-teaching:
 **Gotchas / things that took longer than expected:**
 - **The single scariest moment of the project so far, caught in time.** The `autoassist-db` container had been running since Session 1 via a plain `docker run` with no volume flag at all — meaning my real data (my actual car, my real account, everything from the last two sessions) existed *only* inside that one container's writable layer. Migrating to Docker Compose meant replacing that container, which would have deleted all of it permanently with zero warning. Claude caught this before touching anything, regenerated `seed.sql` from the live database first (the version already in Git was badly out of date — it predated the entire multi-user auth schema from Phase 4.5), and verified the row counts matched exactly before removing the old container. Real lesson, not just a "glad that worked out": always ask "where does this data actually live, and does removing this container delete it?" before running any `docker rm` — not every container is backed by a volume just because it's been running fine for weeks.
 - **`docker compose down` vs. `docker compose down -v`** — the former removes containers but keeps named volumes (data survives); the latter wipes volumes too (data gone). Easy to mix these up and not realize which one you actually ran until it's too late.
+
+---
+
+## Session 10 — Phase 7 (part 1): Terraform Remote State, Billing Alarm, Network (2026-08-04)
+
+**What I did:**
+- Had a real conversation about cost before touching anything, since Terraform in this phase means actual continuous compute spend, not S3/SES pennies. Learned my AWS account (created after July 2025) is on a $200/6-month credit model, not the old 12-month free tier the build guide assumed — real numbers, not the guide's estimate. Decided to destroy the infrastructure between work sessions instead of leaving it running continuously, and to actually set up the billing alarm this time (skipped it for Phase 5, where the cost was near-zero regardless).
+- Created a second, separate IAM user (`autoassist-terraform`, admin-level) just for infrastructure provisioning — deliberately not reusing `autoassist-dev`, the app's own narrowly-scoped runtime credential.
+- Bootstrapped Terraform's remote state (S3 + DynamoDB), then applied the billing alarm (SNS + two CloudWatch alarms) as the very first real resource, before anything that spends money. Then the network layer: VPC, public/private subnets across 2 AZs, security groups.
+
+**What I learned:**
+- Why infrastructure-provisioning credentials and application-runtime credentials should be separate identities: they have completely different jobs (one manages the AWS account itself, one just needs to send an email and touch one S3 bucket), so they should have completely different blast radii if either one is ever compromised.
+- Why RDS in a private subnet doesn't need a NAT gateway even though NAT is usually mentioned in the same breath as private subnets: NAT is only needed when something in the private subnet needs to *initiate* outbound connections to the internet. RDS never does that — it only accepts inbound connections from EC2 within the VPC. Skipping the NAT gateway saves about $32/mo for something nothing here actually needs.
+- The "chicken-and-egg" problem with Terraform remote state is real, not just a guide talking point: you can't store Terraform's state in an S3 bucket that Terraform itself needs to create, so that one bucket has to be created by a tiny separate Terraform config using local state, just once.
+
+**Gotchas / things that took longer than expected:**
+- **AWS security group description fields have a surprisingly strict character set** — no apostrophes, and ASCII only. Wrote "SSH from Muneera's IP only" and "...only — no direct internet access" (an em dash), and both failed `terraform apply` with a validation error partway through, after several other resources had already been created successfully. Small thing, but a good reminder that cloud APIs often have string-field restrictions that don't show up until you actually hit them.
