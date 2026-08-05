@@ -144,9 +144,3 @@ def test_item_with_no_intervals_has_no_projection():
 
     assert result["due_date"] is None
     assert result["status"] == "OK"
-
-
-def test_DELIBERATELY_BROKEN_for_phase8_checkpoint():
-    # Intentional, temporary failure to verify CD blocks deployment on a
-    # failing test. Will be removed immediately after the checkpoint.
-    assert 1 == 2
