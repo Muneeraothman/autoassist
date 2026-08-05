@@ -198,6 +198,8 @@ Frontend: `ReceiptCell.jsx` (per-service-row file input or "View" button dependi
 
 **Checkpoint fully done, for real** (not just code review): uploaded a genuine PNG through the presigned PUT URL, downloaded it back through the presigned GET URL, confirmed byte-for-byte identical. Confirmed the bucket is truly private — the raw S3 URL without a presigned token returns 403. Cross-account isolation confirmed on both new endpoints (404, not just wrong data). Content-type rejection confirmed for a non-image type. All done against disposable test accounts, never Muneera's real vehicle.
 
+**Retroactive correction, found in Session 17 (first real live deployment)**: that checkpoint (and every re-verification of this flow since, including this document's own) was done via `curl`, which doesn't enforce CORS. The bucket had *no* CORS configuration at all, so the browser's own direct PUT to S3 — the actual production path — was silently broken (`Failed to fetch`) this entire time; it just never showed up because nothing had exercised it from a real browser against a real deployed origin until now. Fixed via `aws_s3_bucket_cors_configuration` in `infra/bootstrap/main.tf` (see the Session 17 journal entry for the full diagnosis and why `AllowedOrigins: ["*"]` is safe here). Worth remembering as a general lesson, not just a closed ticket: a `curl`-verified checkpoint proves the server side works, not that a real browser can actually complete the flow.
+
 One minor loose end: a tiny leftover test image sits in the bucket at `users/7/vehicles/6/receipts/18/receipt.png` — Claude couldn't delete it (see the no-`DeleteObject` policy note above), harmless, Muneera can remove it manually if she wants a pristine bucket.
 
 ### ✅ Phase 6 — Dockerize + docker-compose (COMPLETE — "local MVP complete" milestone)
@@ -329,6 +331,12 @@ Two smaller, unrelated things caught along the way during verification: the EC2 
 README (what/why, Mermaid architecture diagram, local setup including the Phase 11 `ingest_manuals.py` step, tech stack, a design-decisions section covering the due-date engine/pre-signed S3/tool-calling-over-SQL-generation/pgvector/ownership-checks, and real-metrics resume bullet drafts) is done — see `README.md`. Also removed a leftover Phase 8 CI/CD test artifact from the frontend (`App.jsx`'s "Deployed via CI/CD — Phase 8 checkpoint v2" tagline), which had no business staying in a "finished" app.
 
 **Not yet done**: demo video, and the final interview-prep rehearsal (explaining the due-date algorithm, the tool-calling security design, and "one thing to improve for production" out loud, unprompted — same format as the still-outstanding Phase 4 rehearsal noted in §3.6).
+
+### Session 17 — First real live deployment (deliberately staying up, not destroy-between-sessions)
+
+**Current infra state — LIVE, at `18.205.7.54`, intentionally kept running** rather than the usual test-then-destroy pattern from every prior phase — explicitly requested so the app is actually reachable on the internet (for demo/interview purposes), not just locally. Includes RDS-side pgvector and a real manual ingestion run (637 chunks for the real Lexus, vehicle id=2) — the chat's manual-lookup questions work on the live deployment, not just locally. **As always, verify directly rather than trust this note if picking this project back up later** — `aws ec2 describe-instances` / `aws rds describe-db-instances`; this is the one exception to the standing destroy-between-sessions pattern, and it should get an explicit decision (keep paying for it, or destroy it) rather than being left running by default past whatever it was needed for.
+
+A real production bug was found and fixed this session against the live deployment: receipt photo uploads were silently broken from a real browser (missing S3 CORS configuration, present since Phase 5, never caught because every prior test used `curl`). See the Phase 5 entry above for the correction and the Session 17 journal entry for the full diagnosis.
 
 ## 5. Portability — confirmed genuinely working across machines
 

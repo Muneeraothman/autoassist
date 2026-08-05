@@ -259,6 +259,43 @@ resource "aws_iam_role_policy" "github_actions_ssm" {
   })
 }
 
+# --- Receipts bucket CORS (Phase 12) --------------------------------------
+# The bucket itself (autoassist-receipts-224603709350) predates Terraform
+# entirely - created manually via the console in Phase 5 - so this only
+# manages its CORS rule, referencing it by name rather than owning/importing
+# the full aws_s3_bucket resource. Lives here, not in the destroyable infra/
+# project, for the same reason ECR does: it needs to survive a
+# `terraform destroy` of the compute resources, and the bucket is never torn
+# down between sessions anyway.
+#
+# Root cause this fixes: receipt uploads go straight from the browser to S3
+# via a pre-signed URL - a cross-origin request from the app's own origin to
+# S3's - and with zero CORS configuration the browser blocked it outright,
+# surfacing as an opaque "Failed to fetch" with nothing useful in the
+# backend logs (the backend's own /receipt-upload-url call succeeds fine;
+# it's the browser's direct PUT to S3 that never got a chance to run).
+# Never caught before because every prior checkpoint of this flow used
+# curl, which doesn't enforce CORS - this is the first time it was actually
+# exercised from a real browser against a live deployment.
+#
+# AllowedOrigins is "*" deliberately, not a specific EC2 IP: the IP changes
+# on every apply (destroy-between-sessions), so a hardcoded origin would go
+# stale immediately, same class of problem as `my_ip_cidr` in the main
+# infra/ project. This is safe specifically because CORS doesn't grant any
+# access by itself - every PUT/GET still requires a valid, time-limited,
+# key-specific pre-signed signature; CORS only controls whether a *browser*
+# permits an already-otherwise-authorized cross-origin request through.
+resource "aws_s3_bucket_cors_configuration" "receipts" {
+  bucket = "autoassist-receipts-224603709350"
+
+  cors_rule {
+    allowed_methods = ["GET", "PUT"]
+    allowed_origins = ["*"]
+    allowed_headers = ["*"]
+    max_age_seconds = 3000
+  }
+}
+
 output "state_bucket_name" {
   value = aws_s3_bucket.terraform_state.id
 }
