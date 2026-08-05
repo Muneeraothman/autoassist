@@ -317,3 +317,16 @@ Needed re-teaching:
 2. "When is my next oil change due?" → correctly used `get_upcoming_maintenance` instead of the manual, and the date matched the actual seeded service record + interval exactly (December 1, 2026) - confirms the system prompt's tool-selection guidance actually works in practice, not just on paper.
 3. A question about jump-starting a "hybrid battery pack" (the 2002 ES300 isn't a hybrid) → didn't hallucinate hybrid instructions; correctly said the manual doesn't cover that because the car doesn't have one, and volunteered the actually-relevant 12V jump-start procedure it did find, with real page citations (273-274) - an even better outcome than a flat "I don't know."
 4. Ownership boundary, same adversarial pattern as Phase 10: forced a direct `search_manual` call against another account's `vehicle_id` (2) from the test account (id=8) - backend rejected it for real (`"No vehicle with id 2 found for this user"`), confirmed via the actual tool-error response.
+
+---
+
+## Session 16 — Phase 12: README and Polish, Started (2026-08-05)
+
+**What I did:**
+- Wrote a real `README.md` from scratch (the old one was 22 lines, essentially just a "how to run it" note): a two-sentence what/why, a Mermaid architecture diagram covering the full request path plus every AWS service involved, an app/chat description (no real screenshots - this is a private, local-first project with no public deployment to capture from, said so directly rather than fake it), updated local setup instructions including Phase 11's new `ingest_manuals.py` step, a tech stack list, a design-decisions section (due-date engine, pre-signed S3, tool-calling-over-SQL-generation, pgvector, ownership-check consistency), a "by the numbers" section, and draft resume bullets - all pulled from real, freshly-checked counts (14/14 tests via an actual `pytest` run, 25 endpoints via `grep -c "^@app\." main.py`, 9/16/637 for schedule items/service records/manual chunks via direct queries), not remembered or estimated figures.
+- Removed a leftover Phase 8 CI/CD test artifact from the frontend: `App.jsx` had a hardcoded `"Deployed via CI/CD — Phase 8 checkpoint v2 (clean auto-deploy proof)"` line on the logged-out screen, left over from proving the pipeline worked. Confirmed it's gone from the actual built bundle, not just the source, before committing.
+
+**What I learned:**
+- Pulling "real metrics" for a resume bullet is itself a small discipline worth naming: every number in the README came from an actual command run in this session (`pytest`, `grep -c`, a live `SELECT count(*)`), not from memory of what the counts "probably" are by now - the kind of thing that's easy to get subtly wrong by trusting an older document instead of the current state.
+
+**Checkpoint:** re-ran the full `pytest` suite (still 14/14) and rebuilt the frontend before committing, confirming nothing broke and the tagline is actually gone from `docker exec autoassist-frontend-1`'s served files, not just assumed from the source diff.

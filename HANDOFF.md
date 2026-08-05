@@ -324,7 +324,11 @@ Two smaller, unrelated things caught along the way during verification: the EC2 
 
 **Explicitly not done, flagged rather than silently skipped**: RDS-side pgvector. This phase was built and tested entirely against the local Postgres instance (matching the user's request); RDS Postgres also supports the `vector` extension, but nothing was set up or tested there. Needs its own `CREATE EXTENSION vector` + a manual-ingestion run against RDS the next time the AWS infra is applied and this needs to work in production, not just locally.
 
-- **Phase 12:** README, architecture diagram, demo video, resume bullets, final interview-prep rehearsal (due-date algorithm, tool-calling security design, one thing to improve for production).
+### 🔶 Phase 12 — Polish (IN PROGRESS)
+
+README (what/why, Mermaid architecture diagram, local setup including the Phase 11 `ingest_manuals.py` step, tech stack, a design-decisions section covering the due-date engine/pre-signed S3/tool-calling-over-SQL-generation/pgvector/ownership-checks, and real-metrics resume bullet drafts) is done — see `README.md`. Also removed a leftover Phase 8 CI/CD test artifact from the frontend (`App.jsx`'s "Deployed via CI/CD — Phase 8 checkpoint v2" tagline), which had no business staying in a "finished" app.
+
+**Not yet done**: demo video, and the final interview-prep rehearsal (explaining the due-date algorithm, the tool-calling security design, and "one thing to improve for production" out loud, unprompted — same format as the still-outstanding Phase 4 rehearsal noted in §3.6).
 
 ## 5. Portability — confirmed genuinely working across machines
 

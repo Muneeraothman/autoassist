@@ -106,7 +106,6 @@ function App() {
     return (
       <div className="app">
         <h1>AutoAssist</h1>
-        <p className="muted">Deployed via CI/CD — Phase 8 checkpoint v2 (clean auto-deploy proof)</p>
         <AuthForm onAuthenticated={setCurrentUser} />
       </div>
     )
