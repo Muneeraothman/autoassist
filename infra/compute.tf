@@ -2,9 +2,16 @@ data "aws_ami" "amazon_linux" {
   most_recent = true
   owners      = ["amazon"]
 
+  # "al2023-ami-*-x86_64" also matches the *minimal* variant
+  # (al2023-ami-minimal-2023.12...), which was actually being selected as
+  # "most recent" - and the minimal image doesn't ship the SSM Agent at all,
+  # which is why CD's SSM deploy step kept failing with no explanation:
+  # nothing was misconfigured, the agent binary simply didn't exist on the
+  # instance. "al2023-ami-2*" matches only the standard variant (name starts
+  # with the year, not "minimal-").
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-2*-x86_64"]
   }
 
   filter {
@@ -55,6 +62,19 @@ resource "aws_iam_role" "ec2" {
       }
     ]
   })
+}
+
+# Required for CD's SSM Run Command deploy to work at all — separate from
+# the GitHub Actions role's ssm:SendCommand permission (which controls who
+# can *issue* commands), this is what lets the SSM Agent already running on
+# the instance register itself as a "managed instance" SSM knows about in
+# the first place. Missing this caused "InvalidInstanceId: Instances not in
+# a valid state for account" on the first real CD deploy attempt — found
+# once the OIDC/DescribeInstances issues were already fixed and this was
+# the next thing blocking the checkpoint.
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 resource "aws_iam_role_policy" "ec2_ses" {

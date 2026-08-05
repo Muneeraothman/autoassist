@@ -13,7 +13,7 @@ variable "billing_alert_email" {
 variable "my_ip_cidr" {
   description = "Muneera's public IP (as a /32 CIDR), for scoping SSH access. Update this if working from a different network — check with `curl https://checkip.amazonaws.com`."
   type        = string
-  default     = "99.72.205.93/32"
+  default     = "129.110.242.97/32"
 }
 
 variable "db_password" {
