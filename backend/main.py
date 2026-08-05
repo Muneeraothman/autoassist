@@ -10,6 +10,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
+import bedrock_utils
 import email_utils
 import s3_utils
 from database import get_db
@@ -107,6 +108,15 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(min_length=8)
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessage]
 
 
 class ReceiptUploadRequest(BaseModel):
@@ -580,6 +590,17 @@ def get_receipt_view_url(
         raise HTTPException(status_code=404, detail="No receipt uploaded for this service")
 
     return {"url": s3_utils.generate_view_url(record.receipt_key)}
+
+
+@app.post("/api/chat")
+def chat(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    vehicles = db.query(Vehicle).filter(Vehicle.user_id == current_user.id).order_by(Vehicle.id).all()
+    reply = bedrock_utils.run_chat(payload.messages, db, current_user, vehicles)
+    return {"reply": reply}
 
 
 class ReminderSentEntry(BaseModel):

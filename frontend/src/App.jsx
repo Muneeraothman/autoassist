@@ -7,6 +7,7 @@ import LogServiceForm from './LogServiceForm'
 import ServiceHistory from './ServiceHistory'
 import UpcomingMaintenance from './UpcomingMaintenance'
 import SpendingDashboard from './SpendingDashboard'
+import ChatWidget from './ChatWidget'
 import './App.css'
 
 function App() {
@@ -156,6 +157,8 @@ function App() {
           <SpendingDashboard vehicleId={selectedVehicleId} refreshKey={historyRefreshKey} />
         </>
       )}
+
+      <ChatWidget />
     </div>
   )
 }

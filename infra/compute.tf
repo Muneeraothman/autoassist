@@ -152,6 +152,33 @@ resource "aws_iam_role_policy" "ec2_ssm_parameter" {
   })
 }
 
+# Phase 10: lets the deployed backend call Bedrock for /api/chat. Claude
+# Sonnet 4.5 has no in-region inference profile in us-east-1, only the "us."
+# geo cross-region one - which needs InvokeModel on both the inference
+# profile resource itself and the underlying foundation model in every
+# region that profile can route to (us-east-1/us-east-2/us-west-2), not just
+# the profile ARN alone.
+resource "aws_iam_role_policy" "ec2_bedrock" {
+  name = "autoassist-ec2-bedrock-policy"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["bedrock:InvokeModel"]
+        Resource = [
+          "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "arn:aws:bedrock:us-east-1:224603709350:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "autoassist-ec2-profile"
   role = aws_iam_role.ec2.name
@@ -185,8 +212,8 @@ resource "aws_instance" "app" {
   }
 
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
-    deploy_bucket      = var.s3_receipts_bucket
-    aws_region         = var.aws_region
+    deploy_bucket = var.s3_receipts_bucket
+    aws_region    = var.aws_region
     # urlencode'd because db_password is random-generated and can contain
     # characters like "/" or "@" that break DATABASE_URL's connection-string
     # parsing when interpolated raw (root-caused a live Phase 9 outage where
