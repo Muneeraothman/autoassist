@@ -14,7 +14,7 @@ import email_utils
 import s3_utils
 from database import get_db
 from engine import get_upcoming_maintenance
-from models import EmailToken, User, Vehicle, ScheduleItem, ServiceRecord
+from models import EmailToken, NotificationLog, User, Vehicle, ScheduleItem, ServiceRecord
 from stats import compute_stats
 
 app = FastAPI()
@@ -25,6 +25,18 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
+
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY")
+NOTIFICATION_DEDUP_DAYS = 7
+
+
+def verify_internal_api_key(request: Request) -> None:
+    # Shared-secret auth, deliberately not a user JWT - the Lambda calling
+    # this has no user session, and this endpoint aggregates data across
+    # every user, which no single user's token should be able to do anyway.
+    provided = request.headers.get("X-Internal-Api-Key")
+    if provided is None or provided != INTERNAL_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing internal API key")
 
 
 def create_access_token(user_id: int) -> str:
@@ -568,3 +580,83 @@ def get_receipt_view_url(
         raise HTTPException(status_code=404, detail="No receipt uploaded for this service")
 
     return {"url": s3_utils.generate_view_url(record.receipt_key)}
+
+
+class ReminderSentEntry(BaseModel):
+    user_id: int
+    vehicle_id: int
+    schedule_item_id: int
+
+
+class RemindersSentRequest(BaseModel):
+    notifications: list[ReminderSentEntry]
+
+
+@app.get("/api/internal/reminders-due")
+def get_reminders_due(db: Session = Depends(get_db), _: None = Depends(verify_internal_api_key)):
+    cutoff = datetime.now(timezone.utc) - timedelta(days=NOTIFICATION_DEDUP_DAYS)
+    today = date.today()
+
+    vehicles = db.query(Vehicle).all()
+    due_items = []
+
+    for vehicle in vehicles:
+        user = db.query(User).filter(User.id == vehicle.user_id).first()
+        schedule_items = db.query(ScheduleItem).filter(ScheduleItem.vehicle_id == vehicle.id).all()
+        service_records = db.query(ServiceRecord).filter(ServiceRecord.vehicle_id == vehicle.id).all()
+
+        results = get_upcoming_maintenance(vehicle, schedule_items, service_records, today)
+
+        for entry in results:
+            if entry["status"] not in ("OVERDUE", "DUE_SOON"):
+                continue
+
+            schedule_item = entry["schedule_item"]
+
+            already_notified = (
+                db.query(NotificationLog)
+                .filter(
+                    NotificationLog.user_id == user.id,
+                    NotificationLog.vehicle_id == vehicle.id,
+                    NotificationLog.schedule_item_id == schedule_item.id,
+                    NotificationLog.sent_at > cutoff,
+                )
+                .first()
+            )
+            if already_notified is not None:
+                continue
+
+            due_items.append(
+                {
+                    "user_id": user.id,
+                    "user_email": user.email,
+                    "vehicle_id": vehicle.id,
+                    "vehicle_label": f"{vehicle.year} {vehicle.make} {vehicle.model}",
+                    "schedule_item_id": schedule_item.id,
+                    "service_name": schedule_item.service_name,
+                    "status": entry["status"],
+                    "due_date": str(entry["due_date"]) if entry["due_date"] else None,
+                    "days_remaining": entry["days_remaining"],
+                    "miles_remaining": entry["miles_remaining"],
+                }
+            )
+
+    return due_items
+
+
+@app.post("/api/internal/reminders-sent")
+def post_reminders_sent(
+    payload: RemindersSentRequest,
+    db: Session = Depends(get_db),
+    _: None = Depends(verify_internal_api_key),
+):
+    for entry in payload.notifications:
+        db.add(
+            NotificationLog(
+                user_id=entry.user_id,
+                vehicle_id=entry.vehicle_id,
+                schedule_item_id=entry.schedule_item_id,
+            )
+        )
+    db.commit()
+    return {"recorded": len(payload.notifications)}

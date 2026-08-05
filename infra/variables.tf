@@ -57,3 +57,15 @@ variable "ecr_frontend_repository_url" {
   type        = string
   default     = "224603709350.dkr.ecr.us-east-1.amazonaws.com/autoassist-frontend"
 }
+
+variable "internal_api_key" {
+  description = "Shared secret for the backend's /api/internal/* endpoints (reminders Lambda auth, not a user JWT). Separate from the local-dev value, same treatment as jwt_secret_key. Passed via TF_VAR_internal_api_key at apply time."
+  type        = string
+  sensitive   = true
+}
+
+variable "backend_url_param" {
+  description = "SSM Parameter Store path where the EC2 instance publishes its current public URL, for the reminders Lambda to read (the IP changes every destroy/apply cycle and Lambda can't use IMDS the way the instance itself can)"
+  type        = string
+  default     = "/autoassist/backend-url"
+}

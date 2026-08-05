@@ -62,3 +62,13 @@ class ServiceRecord(Base):
     performed_by = Column(Text)
     notes = Column(Text)
     receipt_key = Column(Text)
+
+
+class NotificationLog(Base):
+    __tablename__ = "notifications_log"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
+    schedule_item_id = Column(Integer, ForeignKey("schedule_items.id"), nullable=False)
+    sent_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())

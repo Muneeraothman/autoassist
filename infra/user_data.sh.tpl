@@ -37,7 +37,14 @@ AWS_REGION=${aws_region}
 S3_BUCKET_NAME=${s3_bucket_name}
 FRONTEND_BASE_URL=http://$PUBLIC_IP
 BACKEND_BASE_URL=http://$PUBLIC_IP
+INTERNAL_API_KEY=${internal_api_key}
 ENVEOF
+
+# The reminders Lambda (Phase 9) has no way to know this instance's public
+# IP otherwise - it changes every destroy/apply cycle and Lambda doesn't
+# run on the instance, so it can't use IMDS the way this script does.
+aws ssm put-parameter --name "${backend_url_param}" --value "http://$PUBLIC_IP" \
+  --type String --overwrite --region ${aws_region}
 
 # Compose's own variable substitution file (distinct from backend/.env above,
 # which is the Python app's config) - docker compose auto-loads a .env

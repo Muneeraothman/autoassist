@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jpbeqdDNiM6Ep0cLAa9dUknehy6Qj11We2o0AxlshfYem3m2nAolZUVbV17uMbD
+\restrict qH8scikluJzxlBIITF9pri9NQOz7J6hSBvjaknjvguPI1tBNDKy6MdD644vAy7J
 
 -- Dumped from database version 16.14 (Debian 16.14-1.pgdg13+1)
 -- Dumped by pg_dump version 16.14 (Debian 16.14-1.pgdg13+1)
@@ -58,6 +58,43 @@ ALTER SEQUENCE public.email_tokens_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.email_tokens_id_seq OWNED BY public.email_tokens.id;
+
+
+--
+-- Name: notifications_log; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.notifications_log (
+    id integer NOT NULL,
+    user_id integer NOT NULL,
+    vehicle_id integer NOT NULL,
+    schedule_item_id integer NOT NULL,
+    sent_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.notifications_log OWNER TO postgres;
+
+--
+-- Name: notifications_log_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.notifications_log_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.notifications_log_id_seq OWNER TO postgres;
+
+--
+-- Name: notifications_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.notifications_log_id_seq OWNED BY public.notifications_log.id;
 
 
 --
@@ -226,6 +263,13 @@ ALTER TABLE ONLY public.email_tokens ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
+-- Name: notifications_log id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notifications_log ALTER COLUMN id SET DEFAULT nextval('public.notifications_log_id_seq'::regclass);
+
+
+--
 -- Name: schedule_items id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -262,6 +306,12 @@ INSERT INTO public.email_tokens VALUES (2, 2, 'm4teoNrxTnajuzmWs8wEOmVlUDEFATFuX
 INSERT INTO public.email_tokens VALUES (3, 2, 'im2r8jBKVr8KF9fKL8KzQmmJmJRJJIQqoNK9LWAQcu4', 'reset_password', '2026-08-03 06:02:33.386618+00', NULL);
 INSERT INTO public.email_tokens VALUES (4, 2, 'lBsgTFiPsf2SAt4Xkc5BWh5bNlOtQzwLc6etZOOIWP4', 'reset_password', '2026-08-03 06:03:24.085959+00', NULL);
 INSERT INTO public.email_tokens VALUES (5, 2, 'XbtU-GDl-WAO9jj4PfKywyssrLUXMhe9b-o-w6l-hGA', 'reset_password', '2026-08-03 06:04:31.985992+00', NULL);
+
+
+--
+-- Data for Name: notifications_log; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
 
 
 --
@@ -319,7 +369,14 @@ INSERT INTO public.vehicles VALUES (2, 'Lexus', 'ES300', 2002, NULL, 164784, '20
 -- Name: email_tokens_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.email_tokens_id_seq', 9, true);
+SELECT pg_catalog.setval('public.email_tokens_id_seq', 10, true);
+
+
+--
+-- Name: notifications_log_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.notifications_log_id_seq', 1, true);
 
 
 --
@@ -340,7 +397,7 @@ SELECT pg_catalog.setval('public.service_records_id_seq', 18, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 8, true);
+SELECT pg_catalog.setval('public.users_id_seq', 9, true);
 
 
 --
@@ -364,6 +421,14 @@ ALTER TABLE ONLY public.email_tokens
 
 ALTER TABLE ONLY public.email_tokens
     ADD CONSTRAINT email_tokens_token_key UNIQUE (token);
+
+
+--
+-- Name: notifications_log notifications_log_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notifications_log
+    ADD CONSTRAINT notifications_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -415,6 +480,30 @@ ALTER TABLE ONLY public.email_tokens
 
 
 --
+-- Name: notifications_log notifications_log_schedule_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notifications_log
+    ADD CONSTRAINT notifications_log_schedule_item_id_fkey FOREIGN KEY (schedule_item_id) REFERENCES public.schedule_items(id);
+
+
+--
+-- Name: notifications_log notifications_log_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notifications_log
+    ADD CONSTRAINT notifications_log_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: notifications_log notifications_log_vehicle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.notifications_log
+    ADD CONSTRAINT notifications_log_vehicle_id_fkey FOREIGN KEY (vehicle_id) REFERENCES public.vehicles(id);
+
+
+--
 -- Name: schedule_items schedule_items_vehicle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -450,5 +539,5 @@ ALTER TABLE ONLY public.vehicles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jpbeqdDNiM6Ep0cLAa9dUknehy6Qj11We2o0AxlshfYem3m2nAolZUVbV17uMbD
+\unrestrict qH8scikluJzxlBIITF9pri9NQOz7J6hSBvjaknjvguPI1tBNDKy6MdD644vAy7J
 

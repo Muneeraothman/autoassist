@@ -133,6 +133,25 @@ resource "aws_iam_role_policy" "ec2_ecr" {
   })
 }
 
+# Phase 9: lets user_data publish this instance's current public IP so the
+# reminders Lambda (which doesn't run on the instance, so can't use IMDS)
+# can find the backend without a hardcoded, destroy/apply-cycle-stale IP.
+resource "aws_iam_role_policy" "ec2_ssm_parameter" {
+  name = "autoassist-ec2-ssm-parameter-policy"
+  role = aws_iam_role.ec2.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:PutParameter"]
+        Resource = "arn:aws:ssm:${var.aws_region}:224603709350:parameter${var.backend_url_param}"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "autoassist-ec2-profile"
   role = aws_iam_role.ec2.name
@@ -169,6 +188,8 @@ resource "aws_instance" "app" {
     ecr_backend_image  = "${var.ecr_backend_repository_url}:latest"
     ecr_frontend_image = "${var.ecr_frontend_repository_url}:latest"
     ecr_registry       = "224603709350.dkr.ecr.${var.aws_region}.amazonaws.com"
+    internal_api_key   = var.internal_api_key
+    backend_url_param  = var.backend_url_param
   })
 
   tags = {
