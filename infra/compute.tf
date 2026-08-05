@@ -152,12 +152,14 @@ resource "aws_iam_role_policy" "ec2_ssm_parameter" {
   })
 }
 
-# Phase 10: lets the deployed backend call Bedrock for /api/chat. Claude
-# Sonnet 4.5 has no in-region inference profile in us-east-1, only the "us."
-# geo cross-region one - which needs InvokeModel on both the inference
-# profile resource itself and the underlying foundation model in every
-# region that profile can route to (us-east-1/us-east-2/us-west-2), not just
-# the profile ARN alone.
+# Phase 10/11: lets the deployed backend call Bedrock for /api/chat and
+# search_manual. Claude Sonnet 4.5 has no in-region inference profile in
+# us-east-1, only the "us." geo cross-region one - which needs InvokeModel
+# on both the inference profile resource itself and the underlying
+# foundation model in every region that profile can route to
+# (us-east-1/us-east-2/us-west-2), not just the profile ARN alone. Titan
+# Text Embeddings V2 (Phase 11) doesn't have this problem - it's in-region
+# in us-east-1 directly, so just the one foundation-model ARN.
 resource "aws_iam_role_policy" "ec2_bedrock" {
   name = "autoassist-ec2-bedrock-policy"
   role = aws_iam_role.ec2.id
@@ -173,6 +175,7 @@ resource "aws_iam_role_policy" "ec2_bedrock" {
           "arn:aws:bedrock:us-east-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
           "arn:aws:bedrock:us-west-2::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
           "arn:aws:bedrock:us-east-1:224603709350:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+          "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v2:0",
         ]
       }
     ]

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict qH8scikluJzxlBIITF9pri9NQOz7J6hSBvjaknjvguPI1tBNDKy6MdD644vAy7J
+\restrict yfoMaJVPMFHEMjqNAJNIVNylciT9lyUl9dLhuYwqPHbliRw3nakESBJhc4EnafU
 
--- Dumped from database version 16.14 (Debian 16.14-1.pgdg13+1)
--- Dumped by pg_dump version 16.14 (Debian 16.14-1.pgdg13+1)
+-- Dumped from database version 16.14 (Debian 16.14-1.pgdg12+1)
+-- Dumped by pg_dump version 16.14 (Debian 16.14-1.pgdg12+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -17,6 +17,20 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
+
+--
+-- Name: vector; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION vector; Type: COMMENT; Schema: -; Owner: 
+--
+
+COMMENT ON EXTENSION vector IS 'vector data type and ivfflat and hnsw access methods';
+
 
 SET default_tablespace = '';
 
@@ -58,6 +72,44 @@ ALTER SEQUENCE public.email_tokens_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.email_tokens_id_seq OWNED BY public.email_tokens.id;
+
+
+--
+-- Name: manual_chunks; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.manual_chunks (
+    id integer NOT NULL,
+    vehicle_id integer NOT NULL,
+    source_file text NOT NULL,
+    page_number integer NOT NULL,
+    chunk_text text NOT NULL,
+    embedding public.vector(1024) NOT NULL
+);
+
+
+ALTER TABLE public.manual_chunks OWNER TO postgres;
+
+--
+-- Name: manual_chunks_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.manual_chunks_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.manual_chunks_id_seq OWNER TO postgres;
+
+--
+-- Name: manual_chunks_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.manual_chunks_id_seq OWNED BY public.manual_chunks.id;
 
 
 --
@@ -263,6 +315,13 @@ ALTER TABLE ONLY public.email_tokens ALTER COLUMN id SET DEFAULT nextval('public
 
 
 --
+-- Name: manual_chunks id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.manual_chunks ALTER COLUMN id SET DEFAULT nextval('public.manual_chunks_id_seq'::regclass);
+
+
+--
 -- Name: notifications_log id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -369,7 +428,14 @@ INSERT INTO public.vehicles VALUES (2, 'Lexus', 'ES300', 2002, NULL, 164784, '20
 -- Name: email_tokens_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.email_tokens_id_seq', 10, true);
+SELECT pg_catalog.setval('public.email_tokens_id_seq', 12, true);
+
+
+--
+-- Name: manual_chunks_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.manual_chunks_id_seq', 1274, true);
 
 
 --
@@ -383,28 +449,28 @@ SELECT pg_catalog.setval('public.notifications_log_id_seq', 1, true);
 -- Name: schedule_items_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.schedule_items_id_seq', 16, true);
+SELECT pg_catalog.setval('public.schedule_items_id_seq', 20, true);
 
 
 --
 -- Name: service_records_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.service_records_id_seq', 18, true);
+SELECT pg_catalog.setval('public.service_records_id_seq', 22, true);
 
 
 --
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 9, true);
+SELECT pg_catalog.setval('public.users_id_seq', 11, true);
 
 
 --
 -- Name: vehicles_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.vehicles_id_seq', 6, true);
+SELECT pg_catalog.setval('public.vehicles_id_seq', 8, true);
 
 
 --
@@ -421,6 +487,14 @@ ALTER TABLE ONLY public.email_tokens
 
 ALTER TABLE ONLY public.email_tokens
     ADD CONSTRAINT email_tokens_token_key UNIQUE (token);
+
+
+--
+-- Name: manual_chunks manual_chunks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.manual_chunks
+    ADD CONSTRAINT manual_chunks_pkey PRIMARY KEY (id);
 
 
 --
@@ -472,11 +546,26 @@ ALTER TABLE ONLY public.vehicles
 
 
 --
+-- Name: manual_chunks_vehicle_id_idx; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX manual_chunks_vehicle_id_idx ON public.manual_chunks USING btree (vehicle_id);
+
+
+--
 -- Name: email_tokens email_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.email_tokens
     ADD CONSTRAINT email_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id);
+
+
+--
+-- Name: manual_chunks manual_chunks_vehicle_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.manual_chunks
+    ADD CONSTRAINT manual_chunks_vehicle_id_fkey FOREIGN KEY (vehicle_id) REFERENCES public.vehicles(id);
 
 
 --
@@ -539,5 +628,5 @@ ALTER TABLE ONLY public.vehicles
 -- PostgreSQL database dump complete
 --
 
-\unrestrict qH8scikluJzxlBIITF9pri9NQOz7J6hSBvjaknjvguPI1tBNDKy6MdD644vAy7J
+\unrestrict yfoMaJVPMFHEMjqNAJNIVNylciT9lyUl9dLhuYwqPHbliRw3nakESBJhc4EnafU
 

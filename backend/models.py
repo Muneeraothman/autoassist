@@ -1,6 +1,12 @@
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import Boolean, Column, Integer, String, Numeric, DateTime, Date, ForeignKey, Text
 from sqlalchemy.sql import func
 from database import Base
+
+# amazon.titan-embed-text-v2:0's configurable output size - 1024 is the
+# documented default/recommended dimension (512 and 256 are also offered,
+# trading accuracy for storage/speed; not needed at this corpus size).
+EMBEDDING_DIMENSIONS = 1024
 
 
 class User(Base):
@@ -72,3 +78,18 @@ class NotificationLog(Base):
     vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
     schedule_item_id = Column(Integer, ForeignKey("schedule_items.id"), nullable=False)
     sent_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+
+class ManualChunk(Base):
+    __tablename__ = "manual_chunks"
+
+    # vehicle_id from day one, not retrofitted later (per the Phase 4.5
+    # addendum's §5.6 note) - search_manual scopes retrieval to only the
+    # requesting user's own vehicle, same ownership pattern used everywhere
+    # else in the app (REST routes, S3 keys, and now RAG retrieval).
+    id = Column(Integer, primary_key=True)
+    vehicle_id = Column(Integer, ForeignKey("vehicles.id"), nullable=False)
+    source_file = Column(Text, nullable=False)
+    page_number = Column(Integer, nullable=False)
+    chunk_text = Column(Text, nullable=False)
+    embedding = Column(Vector(EMBEDDING_DIMENSIONS), nullable=False)

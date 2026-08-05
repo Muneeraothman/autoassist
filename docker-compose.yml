@@ -1,6 +1,11 @@
 services:
   db:
-    image: postgres:16
+    # pgvector's own image, built FROM postgres:16 with the extension
+    # already compiled in - vanilla postgres:16 has no vector extension
+    # available at all (Phase 11, for manual_chunks). Same data files/format
+    # as postgres:16 underneath, so this is safe against the existing named
+    # volume's real data.
+    image: pgvector/pgvector:pg16
     container_name: autoassist-db
     environment:
       POSTGRES_PASSWORD: devpassword

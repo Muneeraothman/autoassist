@@ -1,8 +1,11 @@
 from datetime import date
 
+from embeddings import embed_text
 from engine import get_upcoming_maintenance
-from models import ScheduleItem, ServiceRecord, Vehicle
+from models import ManualChunk, ScheduleItem, ServiceRecord, Vehicle
 from stats import OTHER_CATEGORY, compute_stats
+
+MANUAL_SEARCH_RESULTS_LIMIT = 5
 
 
 class ToolError(Exception):
@@ -79,6 +82,22 @@ TOOL_SPECS = [
                         "year": {"type": "integer", "description": "Optional year to scope spending to"},
                     },
                     "required": ["vehicle_id"],
+                }
+            },
+        }
+    },
+    {
+        "toolSpec": {
+            "name": "search_manual",
+            "description": "Search the vehicle's owner's manual and maintenance guide for information like fluid types/capacities, part specifications, or how-to procedures - anything that lives in the manual text rather than the structured maintenance schedule. Returns excerpts with page numbers; always cite the page number when answering from this tool's results. Do not use this for questions about what's due, service history, or spending - use the other tools for those.",
+            "inputSchema": {
+                "json": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "What to search for in the manual"},
+                        "vehicle_id": {"type": "integer", "description": "The vehicle's id"},
+                    },
+                    "required": ["query", "vehicle_id"],
                 }
             },
         }
@@ -178,11 +197,39 @@ def _tool_get_spending_summary(db, current_user, vehicle_id, category=None, year
     return result
 
 
+def _tool_search_manual(db, current_user, query, vehicle_id, **_kwargs):
+    _get_owned_vehicle(db, current_user, vehicle_id)
+    query_embedding = embed_text(query)
+
+    results = (
+        db.query(ManualChunk)
+        .filter(ManualChunk.vehicle_id == vehicle_id)
+        .order_by(ManualChunk.embedding.cosine_distance(query_embedding))
+        .limit(MANUAL_SEARCH_RESULTS_LIMIT)
+        .all()
+    )
+
+    if not results:
+        return {"results": [], "note": "No manual has been ingested for this vehicle yet."}
+
+    return {
+        "results": [
+            {
+                "source_file": r.source_file,
+                "page_number": r.page_number,
+                "excerpt": r.chunk_text,
+            }
+            for r in results
+        ]
+    }
+
+
 TOOL_FUNCTIONS = {
     "get_vehicle_info": _tool_get_vehicle_info,
     "get_upcoming_maintenance": _tool_get_upcoming_maintenance,
     "get_service_history": _tool_get_service_history,
     "get_spending_summary": _tool_get_spending_summary,
+    "search_manual": _tool_search_manual,
 }
 
 
