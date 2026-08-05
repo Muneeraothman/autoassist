@@ -167,6 +167,13 @@ resource "aws_instance" "app" {
   iam_instance_profile   = aws_iam_instance_profile.ec2.name
   key_name               = aws_key_pair.ec2.key_name
 
+  # Without this, a user_data edit + plain `apply` just stops/restarts the
+  # SAME instance to update the stored attribute - cloud-init recognizes the
+  # unchanged instance ID as already-initialized and skips re-running
+  # user_data entirely, so the edit never actually executes. Root-caused a
+  # live Phase 9 outage where a user_data fix silently never took effect.
+  user_data_replace_on_change = true
+
   # This AMI's default root volume is only 2GB - nowhere near enough once
   # Docker is pulling two real images plus OS overhead. Hit "no space left
   # on device" mid-pull on first apply after switching to the ECR-based
@@ -180,7 +187,11 @@ resource "aws_instance" "app" {
   user_data = templatefile("${path.module}/user_data.sh.tpl", {
     deploy_bucket      = var.s3_receipts_bucket
     aws_region         = var.aws_region
-    db_password        = var.db_password
+    # urlencode'd because db_password is random-generated and can contain
+    # characters like "/" or "@" that break DATABASE_URL's connection-string
+    # parsing when interpolated raw (root-caused a live Phase 9 outage where
+    # a generated password contained "/").
+    db_password        = urlencode(var.db_password)
     rds_endpoint       = aws_db_instance.main.endpoint
     jwt_secret_key     = var.jwt_secret_key
     ses_sender_email   = var.ses_sender_email

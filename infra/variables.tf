@@ -17,7 +17,7 @@ variable "my_ip_cidr" {
 }
 
 variable "db_password" {
-  description = "Master password for the RDS Postgres instance. Passed via TF_VAR_db_password at apply time — never given a default, never committed to a tfvars file."
+  description = "Master password for the RDS Postgres instance. Passed via TF_VAR_db_password at apply time — never given a default, never committed to a tfvars file. Generate with `openssl rand -hex 32`, not base64: RDS rejects '/', '@', '\"', and spaces outright (ModifyDBInstance errors), and base64's alphabet can produce any of them."
   type        = string
   sensitive   = true
 }

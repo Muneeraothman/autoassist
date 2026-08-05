@@ -24,6 +24,12 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   publicly_accessible    = false
 
+  # Without this, password/config changes queue for the next maintenance
+  # window instead of applying right away - terraform apply reports success
+  # immediately, but RDS keeps running the OLD password until that window
+  # opens, silently breaking anything that was just given the new one.
+  apply_immediately = true
+
   # Deliberate for the destroy-between-sessions workflow: a "real" production
   # DB would want deletion_protection + a final snapshot. Here, easy
   # destroy/recreate is the actual goal, not durability across teardowns —
